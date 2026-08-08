@@ -26,7 +26,7 @@ export function preferredPublicDashboardRoute(): PublicDashboardRoute | null {
     };
   }
 
-  const explicit = config.NIXHOST_PUBLIC_URL?.trim().replace(/\/$/, "");
+  const explicit = config.PLATFORM_PUBLIC_URL?.trim().replace(/\/$/, "");
   if (explicit) {
     return { baseUrl: explicit, kind: "configured-url", stable: true };
   }

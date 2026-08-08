@@ -3,14 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-oauth-disabled-test-"));
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 22).toString("base64");
-process.env.NIXHOST_CLOUDFLARE_OAUTH_ENABLED = "false";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID = "configured-but-disabled";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI =
-  "https://nixhost.example/api/cloudflare/oauth/callback";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_SCOPES = "account:cloudflare_tunnel:edit";
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-oauth-disabled-test-"));
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 22).toString("base64");
+process.env.CLOUDFLARE_OAUTH_ENABLED = "false";
+process.env.CLOUDFLARE_OAUTH_CLIENT_ID = "configured-but-disabled";
+process.env.CLOUDFLARE_OAUTH_REDIRECT_URI =
+  "https://platform.example/api/cloudflare/oauth/callback";
+process.env.CLOUDFLARE_OAUTH_SCOPES = "account:cloudflare_tunnel:edit";
 
 const [oauth, database] = await Promise.all([
   import("../../src/server/cloudflare-oauth.ts"),

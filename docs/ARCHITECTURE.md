@@ -63,8 +63,8 @@ dashboard health endpoint or the intended application's stable proxy.
 ## Persistent state
 
 ```text
-$NIXHOST_DATA_DIR/
-  nixhost.sqlite
+$PLATFORM_DATA_DIR/
+  platform.sqlite
   repositories/       bare Git mirrors
   releases/           immutable worktrees per deployment
   applications/<id>/  persistent data and caches
@@ -91,10 +91,13 @@ Claiming a queued record and moving it to `preparing` occurs transactionally. A 
 - Existing healthy release remains routed.
 - Candidate gets a new private local port.
 - Candidate is launched in a new POSIX session/process group.
-- NixHost checks the configured HTTP health path.
+- Nix Ship checks the configured HTTP health path.
 - SQLite activation and active-port switch are atomic.
 - Stable LAN proxy immediately routes to the candidate.
-- Old process group is then terminated.
+- Previously active releases remain independently reachable, up to the persisted
+  global per-project limit. The oldest excess release and its Quick Tunnel are stopped.
+- Promotion changes only the production pointer used by the stable proxy and custom
+  domains; it does not rebuild the selected healthy release.
 
 Workers are required to stay alive for a startup stability window rather than expose an HTTP health endpoint.
 
@@ -120,7 +123,7 @@ Cloudflare synchronization persists one result per project hostname. The applica
 
 Cloudflare OAuth is deliberately outside the tunnel and DNS controller. The
 stable facade dynamically loads `cloudflare-oauth-provider.ts` only when
-`NIXHOST_CLOUDFLARE_OAUTH_ENABLED=true` and the complete client configuration is
+`CLOUDFLARE_OAUTH_ENABLED=true` and the complete client configuration is
 present. Disabling that one switch leaves account-free Quick Tunnels and manual
 API-token named tunnels intact.
 

@@ -13,7 +13,7 @@ export class GitReconciler {
   private running = false;
 
   boot(): void {
-    this.timer = setInterval(() => void this.reconcile(), config.NIXHOST_GIT_POLL_SECONDS * 1000);
+    this.timer = setInterval(() => void this.reconcile(), config.SOURCE_POLL_SECONDS * 1000);
     this.timer.unref();
     setTimeout(() => void this.reconcile(), 5000).unref();
   }
@@ -28,7 +28,9 @@ export class GitReconciler {
     this.running = true;
     try {
       const apps = getDb()
-        .prepare("SELECT * FROM applications WHERE auto_deploy = 1 AND desired_state = 'running'")
+        .prepare(
+          "SELECT * FROM applications WHERE source_provider = 'github' AND auto_deploy = 1 AND desired_state = 'running'",
+        )
         .all() as AppRow[];
       for (const app of apps) {
         try {

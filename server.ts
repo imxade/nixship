@@ -76,7 +76,7 @@ server.on("upgrade", (request, socket, head) => {
 function requestPath(url: string | undefined): string {
   if (!url) return "unknown";
   try {
-    return new URL(url, "http://nixhost.local").pathname;
+    return new URL(url, "http://platform.local").pathname;
   } catch {
     return "invalid";
   }
@@ -88,7 +88,7 @@ server.keepAliveTimeout = 5_000;
 server.maxHeadersCount = 100;
 
 server.listen(config.PORT, config.HOSTNAME, () => {
-  logger.info("NixHost dashboard listening", {
+  logger.info("Nix Ship dashboard listening", {
     address: `http://${config.HOSTNAME}:${config.PORT}`,
     environment: process.env.NODE_ENV,
   });
@@ -122,7 +122,7 @@ function sanitizeForwardedHeaders(request: http.IncomingMessage): void {
     delete request.headers["x-forwarded-host"];
     delete request.headers["x-forwarded-proto"];
   }
-  request.headers["x-nixhost-client-ip"] = remoteAddress;
+  request.headers["x-platform-client-ip"] = remoteAddress;
 }
 
 function allowSameOriginQuickTunnelHmr(request: http.IncomingMessage): void {
@@ -153,7 +153,7 @@ let shuttingDown = false;
 async function shutdown(signal: string, exitCode = 0): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
-  logger.info("Shutting down NixHost control plane", { signal, exitCode });
+  logger.info("Shutting down Nix Ship control plane", { signal, exitCode });
 
   const forceExit = setTimeout(() => {
     logger.error("Graceful shutdown timed out", { signal });

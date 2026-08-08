@@ -1,12 +1,12 @@
 appId: ${BROWSER_APP_ID}
-name: NixHost first-run owner setup
+name: First-run owner setup
 tags:
   - nix-on-droid
   - first-run
 ---
 - launchApp
 - openLink: ${SETUP_URL}
-- assertVisible: "Claim this NixHost"
+- assertVisible: "Claim this Nix Ship"
 - tapOn: "Owner username"
 - inputText: ${OWNER_USERNAME}
 - tapOn: "Password"
@@ -15,4 +15,4 @@ tags:
 - tapOn: "Create owner account"
 - assertVisible: "Applications"
 - assertVisible: "New application"
-- takeScreenshot: "nixhost-first-run-applications"
+- takeScreenshot: "first-run-applications"

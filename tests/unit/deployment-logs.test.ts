@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe("deployment log reads", () => {
   it("reads bounded ranges and tails", () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-log-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-log-"));
     directories.push(directory);
     const file = path.join(directory, "deployment.log");
     fs.writeFileSync(file, "0123456789");
@@ -34,7 +34,7 @@ describe("deployment log reads", () => {
 
   it("refuses symbolic links where O_NOFOLLOW is available", () => {
     if (typeof fs.constants.O_NOFOLLOW !== "number") return;
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-log-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-log-"));
     directories.push(directory);
     const target = path.join(directory, "target.log");
     const link = path.join(directory, "link.log");

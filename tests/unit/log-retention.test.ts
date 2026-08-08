@@ -42,7 +42,7 @@ describe("log retention", () => {
 });
 
 function temporaryRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-logs-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "platform-logs-"));
   roots.push(root);
   return root;
 }

@@ -35,6 +35,8 @@ type Deployment = {
   activated_at: string | null;
   failure_message: string | null;
   resource_confidence: string;
+  isProduction: boolean;
+  quickTunnel: QuickTunnelState | null;
 };
 type Env = { key: string; secret: boolean; updatedAt: string };
 type AppTab = "deployments" | "logs" | "environment" | "domains" | "settings";
@@ -86,6 +88,8 @@ export function AppDetailClient({ appId }: { appId: string }) {
     const source = new EventSource(`/api/events?scope=app:${appId}`);
     source.addEventListener("deployment.state", () => void load());
     source.addEventListener("deployment.queued", () => void load());
+    source.addEventListener("deployment.deactivated", () => void load());
+    source.addEventListener("deployment.promoted", () => void load());
     source.addEventListener("application.stopped", () => void load());
     source.addEventListener("process.exit", () => void load());
     source.addEventListener("metric", () => void load());
@@ -182,6 +186,18 @@ export function AppDetailClient({ appId }: { appId: string }) {
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Redeploy failed");
+    } finally {
+      setBusy("");
+    }
+  }
+  async function promote(deploymentId: string) {
+    setBusy(`promote-${deploymentId}`);
+    setError("");
+    try {
+      await apiFetch(`/api/deployments/${deploymentId}/promote`, { method: "POST" });
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Promotion failed");
     } finally {
       setBusy("");
     }
@@ -429,6 +445,7 @@ export function AppDetailClient({ appId }: { appId: string }) {
                   <th>Revision</th>
                   <th>Trigger</th>
                   <th>Queued</th>
+                  {app.kind === "web" && <th>Temporary deployment URL</th>}
                   <th></th>
                 </tr>
               </thead>
@@ -437,14 +454,42 @@ export function AppDetailClient({ appId }: { appId: string }) {
                   <tr key={deployment.id}>
                     <td>
                       <StatusBadge state={deployment.state} />
+                      {deployment.isProduction && (
+                        <span className="badge badge-primary badge-sm ml-2">Production</span>
+                      )}
                     </td>
                     <td className="font-mono text-xs">
                       {(deployment.commit_sha || deployment.requested_ref).slice(0, 12)}
                     </td>
                     <td>{deployment.trigger}</td>
                     <td>{formatDate(deployment.queued_at)}</td>
+                    {app.kind === "web" && (
+                      <td className="min-w-64">
+                        {deployment.quickTunnel?.url ? (
+                          <AccessLinks
+                            compact
+                            links={[
+                              {
+                                kind: "temporary",
+                                label: "Temporary",
+                                url: deployment.quickTunnel.url,
+                                status: deployment.quickTunnel.running ? "available" : "starting",
+                                note: deployment.quickTunnel.lastError,
+                              },
+                            ]}
+                          />
+                        ) : deployment.state === "running" ? (
+                          <QuickTunnelNotice
+                            route={deployment.quickTunnel}
+                            activeMessage="This temporary deployment URL is public."
+                          />
+                        ) : (
+                          <span className="text-xs text-base-content/50">Not active</span>
+                        )}
+                      </td>
+                    )}
                     <td>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap gap-1">
                         <button
                           type="button"
                           className="btn btn-xs"
@@ -462,12 +507,39 @@ export function AppDetailClient({ appId }: { appId: string }) {
                             Redeploy this revision
                           </button>
                         )}
+                        {app.kind === "web" &&
+                          deployment.state === "running" &&
+                          !deployment.isProduction && (
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-primary"
+                              disabled={!!busy || data.domains.length === 0}
+                              title={
+                                data.domains.length === 0
+                                  ? "Configure a production domain before promoting"
+                                  : `Promote to ${data.domains[0]}`
+                              }
+                              onClick={() => void promote(deployment.id)}
+                            >
+                              {busy === `promote-${deployment.id}` ? (
+                                <span className="loading loading-spinner loading-xs" />
+                              ) : (
+                                "Promote to production"
+                              )}
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {app.kind === "web" && data.domains.length === 0 && (
+              <p className="mt-3 text-sm text-base-content/60">
+                Configure a production domain on the Domains tab before promoting an active
+                deployment. Temporary deployment URLs continue to work independently.
+              </p>
+            )}
           </div>
           {data.deployments.length === 0 && (
             <p className="text-base-content/60">No deployments yet.</p>
@@ -603,7 +675,7 @@ API_TOKEN=...
             <div>
               <h2 className="text-lg font-bold">Application domains</h2>
               <p className="mt-1 text-sm text-base-content/65">
-                Hostnames in a connected Cloudflare zone are created and routed by NixHost. The
+                Hostnames in a connected Cloudflare zone are created and routed by Nix Ship. The
                 temporary public URL stays active when custom domains are added.
               </p>
               <form method="post" onSubmit={saveDomains} className="mt-4 grid gap-3">
@@ -759,7 +831,7 @@ API_TOKEN=...
             <div>
               <div className="font-bold">Delete application</div>
               <p className="text-sm text-base-content/60">
-                Stops the process and removes NixHost metadata.
+                Stops the process and removes Nix Ship metadata.
               </p>
             </div>
             <button

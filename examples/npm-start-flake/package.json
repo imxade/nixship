@@ -1,5 +1,5 @@
 {
-  "name": "npm-start-nixhost",
+  "name": "npm-start-flake",
   "version": "1.0.0",
   "private": true,
   "type": "module",

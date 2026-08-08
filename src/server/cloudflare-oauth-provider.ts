@@ -46,7 +46,7 @@ export function createCloudflareAuthorization(userId: string): string {
   const state = randomToken(32);
   const verifier = randomToken(64);
   const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
-  const redirectUri = requiredConfig("NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI");
+  const redirectUri = requiredConfig("CLOUDFLARE_OAUTH_REDIRECT_URI");
   const now = nowIso();
   const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
   const db = getDb();
@@ -60,9 +60,9 @@ export function createCloudflareAuthorization(userId: string): string {
   })();
   const authorization = new URL(AUTHORIZATION_ENDPOINT);
   authorization.searchParams.set("response_type", "code");
-  authorization.searchParams.set("client_id", requiredConfig("NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID"));
+  authorization.searchParams.set("client_id", requiredConfig("CLOUDFLARE_OAUTH_CLIENT_ID"));
   authorization.searchParams.set("redirect_uri", redirectUri);
-  authorization.searchParams.set("scope", requiredConfig("NIXHOST_CLOUDFLARE_OAUTH_SCOPES"));
+  authorization.searchParams.set("scope", requiredConfig("CLOUDFLARE_OAUTH_SCOPES"));
   authorization.searchParams.set("state", state);
   authorization.searchParams.set("code_challenge", challenge);
   authorization.searchParams.set("code_challenge_method", "S256");
@@ -90,7 +90,7 @@ export async function completeCloudflareAuthorization(input: {
   }
   const tokens = await requestOAuthToken({
     grant_type: "authorization_code",
-    client_id: requiredConfig("NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID"),
+    client_id: requiredConfig("CLOUDFLARE_OAUTH_CLIENT_ID"),
     code: input.code,
     code_verifier: decryptSecret(session.verifier_encrypted),
     redirect_uri: session.redirect_uri,
@@ -234,7 +234,7 @@ export async function refreshStoredCloudflareOAuthToken(): Promise<string> {
 function refreshCloudflareOAuthToken(refreshToken: string): Promise<CloudflareOAuthTokens> {
   return requestOAuthToken({
     grant_type: "refresh_token",
-    client_id: requiredConfig("NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID"),
+    client_id: requiredConfig("CLOUDFLARE_OAUTH_CLIENT_ID"),
     refresh_token: refreshToken,
   });
 }
@@ -315,10 +315,7 @@ function shouldRefresh(expiresAt: string | null): boolean {
 }
 
 function requiredConfig(
-  key:
-    | "NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID"
-    | "NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI"
-    | "NIXHOST_CLOUDFLARE_OAUTH_SCOPES",
+  key: "CLOUDFLARE_OAUTH_CLIENT_ID" | "CLOUDFLARE_OAUTH_REDIRECT_URI" | "CLOUDFLARE_OAUTH_SCOPES",
 ): string {
   const value = config[key];
   if (!value) {

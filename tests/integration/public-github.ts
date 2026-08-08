@@ -6,27 +6,23 @@ import os from "node:os";
 import path from "node:path";
 import tls from "node:tls";
 
-const repositoryUrl = process.env.NIXHOST_PUBLIC_TEST_REPOSITORY_URL?.trim();
+const repositoryUrl = process.env.PUBLIC_TEST_REPOSITORY_URL?.trim();
 if (!repositoryUrl || !/^https:\/\/github\.com\/[^/]+\/[^/]+(?:\.git)?$/i.test(repositoryUrl)) {
-  throw new Error(
-    "Set NIXHOST_PUBLIC_TEST_REPOSITORY_URL to a dedicated public GitHub test repository",
-  );
+  throw new Error("Set PUBLIC_TEST_REPOSITORY_URL to a dedicated public GitHub test repository");
 }
-if (process.env.NIXHOST_PUBLIC_TEST_PUSH !== "1") {
-  throw new Error(
-    "Set NIXHOST_PUBLIC_TEST_PUSH=1 to acknowledge that this test pushes a marker commit",
-  );
+if (process.env.PUBLIC_TEST_PUSH !== "1") {
+  throw new Error("Set PUBLIC_TEST_PUSH=1 to acknowledge that this test pushes a marker commit");
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-public-github-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "platform-public-github-"));
 const pusher = path.join(root, "pusher");
-process.env.NIXHOST_DATA_DIR = path.join(root, "data");
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 37).toString("base64");
-process.env.NIXHOST_MIN_FREE_DISK_MB = "128";
-process.env.NIXHOST_MIN_FREE_MEMORY_MB = "64";
-process.env.NIXHOST_GIT_POLL_SECONDS = "15";
-process.env.NIXHOST_METRICS_SECONDS = "2";
-process.env.NIXHOST_QUICK_TUNNEL_RECONCILE_SECONDS = "5";
+process.env.PLATFORM_DATA_DIR = path.join(root, "data");
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 37).toString("base64");
+process.env.MIN_FREE_DISK_MB = "128";
+process.env.MIN_FREE_MEMORY_MB = "64";
+process.env.SOURCE_POLL_SECONDS = "15";
+process.env.METRICS_INTERVAL_SECONDS = "2";
+process.env.QUICK_TUNNEL_RECONCILE_SECONDS = "5";
 
 const [{ PlatformRuntime }, database, appService] = await Promise.all([
   import("../../src/server/runtime.ts"),
@@ -39,8 +35,8 @@ let appId: string | null = null;
 
 try {
   run("git", ["clone", repositoryUrl, pusher]);
-  git(pusher, ["config", "user.name", "NixHost push redeployment test"]);
-  git(pusher, ["config", "user.email", "nixhost-test@users.noreply.github.com"]);
+  git(pusher, ["config", "user.name", "Nix Ship push redeployment test"]);
+  git(pusher, ["config", "user.email", "platform-test@users.noreply.github.com"]);
   const branch = git(pusher, ["branch", "--show-current"]).trim();
   assert.ok(branch, "The public fixture clone did not select its remote default branch");
   const firstCommit = git(pusher, ["rev-parse", "HEAD"]).trim();
@@ -70,14 +66,14 @@ try {
   assert.equal(firstRunning.state, "running");
   await assertHealthy(application.public_port);
   await runtime.quickTunnels.reconcile();
-  const firstQuickUrl = await waitForApplicationQuickTunnel(runtime, application.id, 120_000);
+  const firstQuickUrl = await waitForDeploymentQuickTunnel(runtime, first.id, 120_000);
   await new Promise((resolve) => setTimeout(resolve, 30_000));
   await assertPublicHealthy(firstQuickUrl, 180_000);
 
   const marker = new Date().toISOString();
-  fs.writeFileSync(path.join(pusher, ".nixhost-redeploy-marker"), `${marker}\n`);
-  git(pusher, ["add", ".nixhost-redeploy-marker"]);
-  git(pusher, ["commit", "-m", `test: verify NixHost push redeployment ${marker}`]);
+  fs.writeFileSync(path.join(pusher, ".platform-redeploy-marker"), `${marker}\n`);
+  git(pusher, ["add", ".platform-redeploy-marker"]);
+  git(pusher, ["commit", "-m", `test: verify Nix Ship push redeployment ${marker}`]);
   const pushedCommit = git(pusher, ["rev-parse", "HEAD"]).trim();
   assert.notEqual(pushedCommit, firstCommit);
   const pushedAt = Date.now();
@@ -100,8 +96,8 @@ try {
     "superseded",
   );
   await assertHealthy(application.public_port);
-  const redeployedQuickUrl = await waitForApplicationQuickTunnel(runtime, application.id, 30_000);
-  assert.equal(redeployedQuickUrl, firstQuickUrl);
+  const redeployedQuickUrl = await waitForDeploymentQuickTunnel(runtime, redeployed.id, 30_000);
+  assert.notEqual(redeployedQuickUrl, firstQuickUrl);
   await assertPublicHealthy(redeployedQuickUrl, 120_000);
 
   console.log(
@@ -117,7 +113,7 @@ try {
       stableProxyHealthy: true,
       quickTunnelUrl: redeployedQuickUrl,
       quickTunnelHealthy: true,
-      quickTunnelStableAcrossRedeployment: true,
+      independentDeploymentQuickTunnel: true,
     }),
   );
 } finally {
@@ -179,15 +175,15 @@ async function assertHealthy(publicPort: number): Promise<void> {
   assert.match(await response.text(), /"status":"ok"/);
 }
 
-async function waitForApplicationQuickTunnel(
+async function waitForDeploymentQuickTunnel(
   activeRuntime: InstanceType<typeof PlatformRuntime>,
-  applicationId: string,
+  deploymentId: string,
   timeoutMs: number,
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await activeRuntime.quickTunnels.reconcile();
-    const route = activeRuntime.quickTunnels.applicationRoute(applicationId);
+    const route = activeRuntime.quickTunnels.deploymentRoute(deploymentId);
     if (route?.running && route.url) return route.url;
     if (route?.status === "error") {
       throw new Error(`Application Quick Tunnel failed: ${route.lastError ?? "unknown error"}`);

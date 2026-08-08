@@ -1,8 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
-const portBase = Number(process.env.NIXHOST_E2E_PORT_BASE ?? 3000);
+const portBase = Number(process.env.E2E_PORT_BASE ?? 3000);
 if (!Number.isInteger(portBase) || portBase < 1 || portBase > 65532) {
-  throw new Error("NIXHOST_E2E_PORT_BASE must leave room for four valid TCP ports");
+  throw new Error("E2E_PORT_BASE must leave room for four valid TCP ports");
 }
 const setupPort = portBase;
 const adminPort = portBase + 1;
@@ -43,7 +43,7 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
       env: {
-        NIXHOST_E2E_PORT: String(setupPort),
+        E2E_PORT: String(setupPort),
       },
     },
     {
@@ -61,8 +61,8 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
       env: {
-        NIXHOST_E2E_INSTANCE: "native",
-        NIXHOST_E2E_PORT: String(nativeAuthPort),
+        E2E_INSTANCE: "native",
+        E2E_PORT: String(nativeAuthPort),
       },
     },
     {
@@ -71,9 +71,9 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
       env: {
-        NIXHOST_E2E_COMMAND: "dev",
-        NIXHOST_E2E_INSTANCE: "development",
-        NIXHOST_E2E_PORT: String(developmentPort),
+        E2E_COMMAND: "dev",
+        E2E_INSTANCE: "development",
+        E2E_PORT: String(developmentPort),
       },
     },
   ],

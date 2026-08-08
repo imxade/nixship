@@ -1,12 +1,12 @@
-# NixHost Specification
+# Nix Ship Specification
 
 This file is the compact implementation contract. Detailed rationale and operational guidance live under `docs/`.
 
 ## Product boundary
 
-NixHost is a LAN-first personal application host. It runs as one persistent self-hosted Next.js and TypeScript control plane on any Nix-capable Linux or macOS host. It is not a VPS, virtual machine, container runtime, NixOS installation, or multi-tenant sandbox. Android support through Nix-on-Droid is tracked in [`docs/ANDROID.md`](docs/ANDROID.md) and the future APK distribution will live in a separate repository.
+Nix Ship is a LAN-first personal application host. It runs as one persistent self-hosted Next.js and TypeScript control plane on any Nix-capable Linux or macOS host. It is not a VPS, virtual machine, container runtime, NixOS installation, or multi-tenant sandbox. Android support through Nix-on-Droid is tracked in [`docs/ANDROID.md`](docs/ANDROID.md) and the future APK distribution will live in a separate repository.
 
-Only trusted GitHub repositories are accepted. Every production deployment requires `flake.nix`, `flake.lock`, and a runnable `apps.<system>.<name>` output. A project may keep its production package in `nixhost.nix`, but the locked flake remains the only discovery and execution entry point. The normal deployment path never accepts arbitrary dashboard shell commands.
+Only trusted GitHub repositories and verified immutable Harbur snapshots are accepted. Every production deployment requires `flake.nix`, `flake.lock`, and a runnable `apps.<system>.<name>` output. A project may keep its production package in `live.nix`, but the locked flake remains the only discovery and execution entry point. The normal deployment path never accepts arbitrary dashboard shell commands.
 
 ## Required behavior
 
@@ -47,7 +47,7 @@ Only trusted GitHub repositories are accepted. Every production deployment requi
 18. Cloudflare credentials are stored only after account/zone ownership and
     tunnel-list access are verified. OAuth state expires, is consumed exactly
     once and remains bound to the authenticated user who started authorization.
-    NixHost does not create account-free or Vercel-style default public domains.
+    Nix Ship does not create account-free or Vercel-style default public domains.
 19. Authenticated application, user, integration and settings flows remain
     operable without horizontal overflow on phone, tablet and desktop screens.
 20. Every authenticated user can change their own password after confirming the
@@ -63,21 +63,27 @@ Only trusted GitHub repositories are accepted. Every production deployment requi
     edge reaches the intended local route. A control-plane startup failure
     before the HTTP server is ready must not leave tunnel processes or
     persistent-runtime state behind.
+24. Each active web deployment has its own temporary Quick Tunnel URL. A persisted
+    global retention limit is enforced independently per project, with deterministic
+    oldest-first deactivation while deployment history remains stored.
+25. A healthy retained deployment can be promoted without a rebuild when the project
+    has a production domain. The production pointer and stable proxy route change
+    atomically; projects without a domain reject promotion without changing state.
 
 ## Android distribution tracks
 
-The current Android track runs NixHost through Nix-on-Droid. It is not release-validated until the complete host and dashboard flow passes on physical ARM64 Android devices. Device acceptance combines command-level Nix-on-Droid checks with Maestro automation of the Android browser UI, including setup, authentication, GitHub connection, application creation, deployment status, LAN access and session expiry.
+The current Android track runs Nix Ship through Nix-on-Droid. It is not release-validated until the complete host and dashboard flow passes on physical ARM64 Android devices. Device acceptance combines command-level Nix-on-Droid checks with Maestro automation of the Android browser UI, including setup, authentication, GitHub connection, application creation, deployment status, LAN access and session expiry.
 
 The future distribution target is a self-contained APK with no separate Nix-on-Droid installation or terminal setup. The APK must start and supervise the local control plane through an Android foreground-service platform adapter, open an embedded or system web interface for first-run configuration, preserve the existing Next.js/TypeScript control plane and Nix flake deployment contract, and surface lifecycle failures honestly. It must package or safely provision every required runtime component, satisfy Android packaging and licensing requirements, and pass the same physical-device gate before release. APK source, native wrapper code, signing, binaries and store distribution are out of scope for this repository and will live in a separate Android distribution repository.
 
-Both tracks retain the same network contract: authenticated local access over LAN, with optional authenticated Cloudflare exposure. An APK must not weaken NixHost roles, sessions, origin validation, GitHub permissions or Cloudflare Access guidance.
+Both tracks retain the same network contract: authenticated local access over LAN, with optional authenticated Cloudflare exposure. An APK must not weaken Nix Ship roles, sessions, origin validation, GitHub permissions or Cloudflare Access guidance.
 
 ## Application runtime contract
 
 A runnable flake app must remain in the foreground and accept injected operational variables:
 
 ```text
-NIXHOST=1
+MANAGED_DEPLOYMENT=1
 APP_ID
 APP_NAME
 DEPLOYMENT_ID
@@ -103,7 +109,7 @@ Credentials embedded in URLs, query strings, fragments, alternate hosts, local p
 
 ## Safety and trust
 
-A flake can execute arbitrary evaluation, build, and runtime code as the NixHost OS account. Nix reproducibility is not workload isolation. Only the node owner’s trusted repositories may be deployed.
+A flake can execute arbitrary evaluation, build, and runtime code as the Nix Ship OS account. Nix reproducibility is not workload isolation. Only the node owner’s trusted repositories may be deployed.
 
 ## Source of truth
 

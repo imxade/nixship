@@ -6,6 +6,7 @@ import { encryptSecret } from "./crypto.ts";
 import { getDb, nowIso } from "./db.ts";
 import { HttpError } from "./errors.ts";
 import { isValidGitBranchName, remoteDefaultBranch } from "./git.ts";
+import { getHarburConnection, listHarburRepositories } from "./harbur.ts";
 import { allocatePublicPort } from "./ports.ts";
 import type { AppRow, DeploymentRow } from "./types.ts";
 
@@ -18,14 +19,10 @@ const branchSchema = z
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  repositoryUrl: z
-    .string()
-    .trim()
-    .url()
-    .refine(
-      isSupportedGitHubRepositoryUrl,
-      "Use an HTTPS GitHub repository URL such as https://github.com/owner/repository.git",
-    ),
+  sourceProvider: z.enum(["github", "harbur"]).default("github"),
+  repositoryUrl: z.string().trim().max(2048).optional(),
+  harburConnectionId: z.string().uuid().optional(),
+  harburRepositoryId: z.string().trim().min(3).max(201).optional(),
   branch: z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     branchSchema.optional(),
@@ -62,10 +59,48 @@ export async function createApplication(
   actor?: { id: string; ip?: string | null },
 ): Promise<AppRow> {
   const input = createSchema.parse(raw);
-  input.repositoryUrl = normalizeGitHubRepositoryUrl(input.repositoryUrl);
-  const branch =
-    input.branch ??
-    (await remoteDefaultBranch(input.repositoryUrl, input.githubInstallationId ?? null));
+  let repositoryUrl: string;
+  let branch: string;
+  let sourceRepositoryId: string | null = null;
+  let sourceConnectionId: string | null = null;
+  if (input.sourceProvider === "github") {
+    if (!input.repositoryUrl || !isSupportedGitHubRepositoryUrl(input.repositoryUrl)) {
+      throw new HttpError(
+        400,
+        "Use an HTTPS GitHub repository URL such as https://github.com/owner/repository.git",
+        "invalid_repository_url",
+      );
+    }
+    repositoryUrl = normalizeGitHubRepositoryUrl(input.repositoryUrl);
+    branch =
+      input.branch ??
+      (await remoteDefaultBranch(repositoryUrl, input.githubInstallationId ?? null));
+  } else {
+    if (!input.harburConnectionId || !input.harburRepositoryId) {
+      throw new HttpError(
+        400,
+        "Choose a connected Harbur repository",
+        "harbur_repository_required",
+      );
+    }
+    const connection = getHarburConnection(input.harburConnectionId);
+    const repository = (await listHarburRepositories(connection)).find(
+      (candidate) => candidate.id === input.harburRepositoryId,
+    );
+    if (!repository?.latestSnapshot) {
+      throw new HttpError(
+        400,
+        "The selected Harbur repository has no deployable snapshot",
+        "harbur_snapshot_missing",
+      );
+    }
+    sourceRepositoryId = repository.id;
+    sourceConnectionId = connection.id;
+    repositoryUrl = `${connection.base_url}/repo/${encodeURIComponent(repository.owner)}/${encodeURIComponent(
+      repository.name,
+    )}`;
+    branch = repository.defaultBranch;
+  }
   const id = crypto.randomUUID();
   const slug = uniqueSlug(input.name);
   const publicPort = input.kind === "web" ? await allocatePublicPort() : null;
@@ -73,20 +108,24 @@ export async function createApplication(
   getDb()
     .prepare(
       `INSERT INTO applications(id, name, slug, kind, repository_url, branch, flake_output,
+        source_provider, source_repository_id, source_connection_id,
         github_repository_id, github_installation_id, auto_deploy, desired_state, restart_policy,
         health_path, health_timeout_seconds, startup_timeout_seconds, public_port, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', 'on-failure', ?, 5, 1800, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', 'on-failure', ?, 5, 1800, ?, ?, ?)`,
     )
     .run(
       id,
       input.name,
       slug,
       input.kind,
-      input.repositoryUrl,
+      repositoryUrl,
       branch,
       input.flakeOutput,
-      input.githubRepositoryId ?? null,
-      input.githubInstallationId ?? null,
+      input.sourceProvider,
+      sourceRepositoryId,
+      sourceConnectionId,
+      input.sourceProvider === "github" ? (input.githubRepositoryId ?? null) : null,
+      input.sourceProvider === "github" ? (input.githubInstallationId ?? null) : null,
       input.autoDeploy ? 1 : 0,
       input.healthPath,
       publicPort,
@@ -99,7 +138,7 @@ export async function createApplication(
     action: "application.created",
     entityType: "application",
     entityId: id,
-    details: { name: input.name, repositoryUrl: input.repositoryUrl },
+    details: { name: input.name, repositoryUrl, sourceProvider: input.sourceProvider },
   });
   return getApplication(id);
 }
@@ -129,6 +168,13 @@ export function updateApplication(
 ): AppRow {
   const input = updateSchema.parse(raw);
   const app = getApplication(id);
+  if (app.source_provider === "harbur" && input.branch !== undefined) {
+    throw new HttpError(
+      400,
+      "Harbur snapshot sources do not use an editable branch",
+      "harbur_branch",
+    );
+  }
   const columns: string[] = [];
   const values: unknown[] = [];
   const add = (column: string, value: unknown) => {
@@ -228,10 +274,10 @@ export function setEnvironment(
     if (!/^[A-Z_][A-Z0-9_]*$/i.test(key))
       throw new HttpError(400, `Invalid environment variable name: ${key}`, "invalid_env_key");
     if (
-      key.startsWith("NIXHOST_") ||
+      key.startsWith("PLATFORM_") ||
       ["PORT", "HOST", "DATA_DIR", "CACHE_DIR", "LOG_DIR"].includes(key)
     ) {
-      throw new HttpError(400, `${key} is reserved by NixHost`, "reserved_env_key");
+      throw new HttpError(400, `${key} is reserved by Nix Ship`, "reserved_env_key");
     }
     if (Buffer.byteLength(value) > 64 * 1024)
       throw new HttpError(400, `${key} exceeds 64 KiB`, "env_value_too_large");

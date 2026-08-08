@@ -207,7 +207,7 @@ export function CloudflareClient() {
     <>
       <PageHeading
         title="Cloudflare"
-        description="Connect once, then NixHost creates and supervises the tunnel, DNS records, and application routes."
+        description="Connect once, then Nix Ship creates and supervises the tunnel, DNS records, and application routes."
         actions={
           status?.configured ? (
             <>
@@ -270,8 +270,8 @@ export function CloudflareClient() {
             <div className="card-body">
               <h2 className="card-title">Connect your Cloudflare account</h2>
               <p className="text-sm text-base-content/65">
-                Authorize NixHost, choose an existing Cloudflare DNS zone, and the persistent tunnel
-                starts automatically.
+                Authorize Nix Ship, choose an existing Cloudflare DNS zone, and the persistent
+                tunnel starts automatically.
               </p>
               {status.oauth.pending ? (
                 <OAuthCompletionForm
@@ -364,7 +364,7 @@ function OAuthCompletionForm({
       </label>
       <label className="form-control">
         <span className="label-text mb-1">Tunnel name</span>
-        <input required name="tunnelName" defaultValue="nixhost" className="input input-bordered" />
+        <input required name="tunnelName" defaultValue="nixship" className="input input-bordered" />
       </label>
       <label className="form-control">
         <span className="label-text mb-1">Dashboard hostname (optional)</span>
@@ -412,7 +412,7 @@ function ManualConnectionForm({
       </label>
       <label className="form-control">
         <span className="label-text mb-1">Tunnel name</span>
-        <input required name="tunnelName" defaultValue="nixhost" className="input input-bordered" />
+        <input required name="tunnelName" defaultValue="nixship" className="input input-bordered" />
       </label>
       <label className="form-control">
         <span className="label-text mb-1">Dashboard hostname (optional)</span>
@@ -513,7 +513,7 @@ function ConfiguredConnection({
           </button>
           <div className="alert alert-warning text-sm">
             <span>
-              Protect the public dashboard with Cloudflare Access in addition to NixHost login.
+              Protect the public dashboard with Cloudflare Access in addition to Nix Ship login.
             </span>
           </div>
         </div>

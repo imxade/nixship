@@ -12,11 +12,11 @@ if (!fs.existsSync(serverEntry)) {
 }
 
 const configuredDataDirectory =
-  process.env.NIXHOST_CI_DATA_DIR ??
-  `${process.env.NIXHOST_E2E_DATA_DIR ?? path.join(process.cwd(), ".e2e-data")}-ci`;
+  process.env.CI_DATA_DIR ??
+  `${process.env.E2E_DATA_DIR ?? path.join(process.cwd(), ".e2e-data")}-ci`;
 const dataDirectory = path.resolve(configuredDataDirectory);
 const basename = path.basename(dataDirectory);
-if (!basename.startsWith(".e2e-data") && !basename.startsWith("nixhost-e2e")) {
+if (!basename.startsWith(".e2e-data") && !basename.startsWith("platform-e2e")) {
   throw new Error(`Refusing to clear an unsafe CI data path: ${dataDirectory}`);
 }
 
@@ -24,12 +24,12 @@ fs.rmSync(dataDirectory, { recursive: true, force: true });
 Object.assign(process.env, {
   HOSTNAME: "127.0.0.1",
   NODE_ENV: "production",
-  NIXHOST_DATA_DIR: dataDirectory,
+  PLATFORM_DATA_DIR: dataDirectory,
 });
 process.env.PORT ??= "3001";
-process.env.NIXHOST_MIN_FREE_DISK_MB ??= "128";
-process.env.NIXHOST_MIN_FREE_MEMORY_MB ??= "64";
-process.env.NIXHOST_QUICK_TUNNELS_ENABLED ??= "false";
+process.env.MIN_FREE_DISK_MB ??= "128";
+process.env.MIN_FREE_MEMORY_MB ??= "64";
+process.env.QUICK_TUNNELS_ENABLED ??= "false";
 
 const [{ getDb, closeDb, nowIso }, { hashPassword, randomToken }] = await Promise.all([
   import("../src/server/db.ts"),

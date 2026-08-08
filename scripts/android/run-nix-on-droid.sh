@@ -11,7 +11,7 @@ case "$mode" in
 esac
 
 if [[ ! -f flake.nix || ! -f package.json ]]; then
-  echo "Run this script from the NixHost repository root." >&2
+  echo "Run this script from the Nix Ship repository root." >&2
   exit 2
 fi
 
@@ -32,7 +32,7 @@ for executable in nix nix-on-droid git; do
 done
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-evidence_root="${NIXHOST_ANDROID_EVIDENCE_DIR:-$PWD/artifacts/android}"
+evidence_root="${ANDROID_EVIDENCE_DIR:-$PWD/artifacts/android}"
 evidence_directory="$evidence_root/nix-on-droid-$timestamp"
 mkdir -p "$evidence_directory"
 exec > >(tee "$evidence_directory/nix-on-droid.log") 2>&1
@@ -60,8 +60,8 @@ nix develop --command pnpm typecheck
 nix develop --command pnpm test
 nix develop --command pnpm build
 nix develop --command pnpm test:examples
-NIXHOST_DATA_DIR="$evidence_directory/db-doctor" nix develop --command pnpm db:doctor
-NIXHOST_DATA_DIR="$evidence_directory/db-doctor" nix develop --command pnpm security:check
+PLATFORM_DATA_DIR="$evidence_directory/db-doctor" nix develop --command pnpm db:doctor
+PLATFORM_DATA_DIR="$evidence_directory/db-doctor" nix develop --command pnpm security:check
 nix flake check --print-build-logs
 nix build --print-build-logs
 

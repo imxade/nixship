@@ -58,7 +58,7 @@ export class ProcessSupervisor {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       ...Object.fromEntries(envRows.map((row) => [row.key, decryptSecret(row.value_encrypted)])),
-      NIXHOST: "1",
+      MANAGED_DEPLOYMENT: "1",
       APP_ID: app.id,
       APP_NAME: app.name,
       DEPLOYMENT_ID: deployment.id,
@@ -148,24 +148,30 @@ export class ProcessSupervisor {
   }
 
   private async reconcile(): Promise<void> {
-    const apps = getDb()
+    const deployments = getDb()
       .prepare(
-        "SELECT * FROM applications WHERE desired_state = 'running' AND active_deployment_id IS NOT NULL",
+        `SELECT d.*
+         FROM deployments d
+         JOIN applications a ON a.id = d.app_id
+         WHERE d.state = 'running' AND a.desired_state = 'running'
+         ORDER BY d.activated_at DESC, d.queued_at DESC, d.id DESC`,
       )
-      .all() as AppRow[];
-    for (const app of apps) {
-      if (!app.active_deployment_id) continue;
-      const deployment = getDb()
-        .prepare("SELECT * FROM deployments WHERE id = ?")
-        .get(app.active_deployment_id) as DeploymentRow | undefined;
-      if (!deployment) continue;
+      .all() as DeploymentRow[];
+    for (const deployment of deployments) {
       if (this.isAlive(deployment)) continue;
+      const app = getDb()
+        .prepare("SELECT * FROM applications WHERE id = ?")
+        .get(deployment.app_id) as AppRow | undefined;
+      if (!app) continue;
+      const wasProduction = app.active_deployment_id === deployment.id;
       getDb().transaction(() => {
-        getDb()
-          .prepare(
-            "UPDATE applications SET active_internal_port = NULL, active_deployment_id = NULL, updated_at = ? WHERE id = ? AND active_deployment_id = ?",
-          )
-          .run(nowIso(), app.id, deployment.id);
+        if (wasProduction) {
+          getDb()
+            .prepare(
+              "UPDATE applications SET active_internal_port = NULL, active_deployment_id = NULL, updated_at = ? WHERE id = ? AND active_deployment_id = ?",
+            )
+            .run(nowIso(), app.id, deployment.id);
+        }
         if (deployment.state === "running") {
           const cleanExit = deployment.exit_code === 0 && !deployment.exit_signal;
           getDb()
@@ -183,6 +189,28 @@ export class ProcessSupervisor {
             );
         }
       })();
+      if (!wasProduction) continue;
+
+      const fallbacks = getDb()
+        .prepare(
+          `SELECT * FROM deployments WHERE app_id = ? AND state = 'running'
+           ORDER BY activated_at DESC, queued_at DESC, id DESC`,
+        )
+        .all(app.id) as DeploymentRow[];
+      const fallback = fallbacks.find((candidate) => this.isAlive(candidate));
+      if (fallback) {
+        getDb()
+          .prepare(
+            `UPDATE applications SET active_deployment_id = ?, active_internal_port = ?, updated_at = ?
+             WHERE id = ? AND active_deployment_id IS NULL`,
+          )
+          .run(fallback.id, fallback.internal_port, nowIso(), app.id);
+        events.publish("deployment.promoted", `app:${app.id}`, {
+          deploymentId: fallback.id,
+          reason: "production_process_failed",
+        });
+        continue;
+      }
       const pending = getDb()
         .prepare(
           "SELECT 1 FROM deployments WHERE app_id = ? AND state IN ('queued','preparing','fetching','evaluating','starting','health-checking','activating') LIMIT 1",

@@ -318,7 +318,7 @@ export class CloudflareController {
     if (row.tunnel_id && row.tunnel_token_encrypted) return;
     const created = await cfRequest<{ id: string }>(row, `/accounts/${row.account_id}/cfd_tunnel`, {
       method: "POST",
-      body: JSON.stringify({ name: row.tunnel_name || "nixhost", config_src: "cloudflare" }),
+      body: JSON.stringify({ name: row.tunnel_name || "nixship", config_src: "cloudflare" }),
     });
     const token = await cfRequest<string>(
       row,
@@ -336,20 +336,16 @@ export class CloudflareController {
     const row = getCloudflareConfig();
     if (!row?.tunnel_token_encrypted) throw new Error("Cloudflare tunnel token is unavailable");
     const log = `${paths.logs}/cloudflared.log`;
-    const child = spawnLogged(
-      config.NIXHOST_CLOUDFLARED_BIN,
-      ["tunnel", "--no-autoupdate", "run"],
-      {
-        cwd: paths.data,
-        env: {
-          ...process.env,
-          TUNNEL_TOKEN: decryptSecret(row.tunnel_token_encrypted),
-        },
-        stdoutPath: log,
-        stderrPath: log,
-        detached: true,
+    const child = spawnLogged(config.CLOUDFLARED_BIN, ["tunnel", "--no-autoupdate", "run"], {
+      cwd: paths.data,
+      env: {
+        ...process.env,
+        TUNNEL_TOKEN: decryptSecret(row.tunnel_token_encrypted),
       },
-    );
+      stdoutPath: log,
+      stderrPath: log,
+      detached: true,
+    });
     if (!child.pid) throw new Error("cloudflared did not return a process ID");
     const identity = captureProcessIdentity(child.pid);
     if (!identity) {
@@ -611,7 +607,7 @@ async function ensureDnsRecord(
     content: `${row.tunnel_id}.cfargotunnel.com`,
     proxied: true,
     ttl: 1,
-    comment: "Managed by NixHost",
+    comment: "Managed by Nix Ship",
   };
   if (query[0]) {
     await cfRequest(row, `/zones/${zoneId}/dns_records/${query[0].id}`, {
@@ -693,7 +689,12 @@ async function deleteManagedDnsRecord(row: CloudflareRow, hostname: string): Pro
   );
   const expectedContent = `${row.tunnel_id}.cfargotunnel.com`;
   for (const record of records) {
-    if (record.content !== expectedContent || record.comment !== "Managed by NixHost") continue;
+    if (
+      record.content !== expectedContent ||
+      !["Managed by Nix Ship", "Managed by Nix Ship"].includes(record.comment ?? "")
+    ) {
+      continue;
+    }
     await cfRequest(row, `/zones/${zoneId}/dns_records/${record.id}`, { method: "DELETE" });
   }
 }

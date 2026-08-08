@@ -53,7 +53,10 @@ export function AccountClient({
 
   return (
     <>
-      <PageHeading title="Account" description="Manage the credentials for your NixHost account." />
+      <PageHeading
+        title="Account"
+        description="Manage the credentials for your Nix Ship account."
+      />
       <div className="grid max-w-4xl gap-5 lg:grid-cols-[18rem_1fr]">
         <section className="card h-fit border border-base-300 bg-base-100">
           <div className="card-body">

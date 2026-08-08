@@ -43,7 +43,7 @@ server runs the complete create/change/logout/login lifecycle with JavaScript
 disabled and fails if any password field appears in a request URL. A fourth
 source-development server verifies that the custom HTTP server completes the
 Next.js HMR WebSocket upgrade over both LAN and a simulated same-origin Quick
-Tunnel request. Set `NIXHOST_E2E_PORT_BASE` when the default four-port range
+Tunnel request. Set `E2E_PORT_BASE` when the default four-port range
 beginning at 3000 is already occupied.
 
 Authenticated dashboard routes are also exercised at `320x568`, `768x1024`,
@@ -86,7 +86,7 @@ root of an isolated Git repository, deploys its exact commit, waits for its real
 health endpoint, verifies the stable proxy response, and stops its process group.
 
 `pnpm test:github-public` is a separate opt-in external test. It requires a
-dedicated repository URL and `NIXHOST_PUBLIC_TEST_PUSH=1`, pushes a marker
+dedicated repository URL and `PUBLIC_TEST_PUSH=1`, pushes a marker
 commit, then waits for the background polling loop without calling reconciliation
 directly. It proves that the exact pushed commit activates, the stable proxy stays
 healthy, the old release is superseded, and a real application Quick Tunnel serves
@@ -96,7 +96,7 @@ when the test host's resolver has negatively cached the newly assigned hostname.
 It must never be pointed at a repository whose history should remain untouched.
 
 The 2026-07-26 acceptance run used the public
-`imxade/nixhost-deployment-test` fixture whose default branch is `trunk`. Normal
+`imxade/platform-deployment-test` fixture whose default branch is `trunk`. Normal
 background reconciliation detected pushed commit
 `847ec6394705ab0810f93d21eda6ff503b0729e3` within 10 seconds, activated that
 exact revision and served it through the same application Quick Tunnel before
@@ -131,7 +131,7 @@ For the current Nix-on-Droid distribution:
 
 1. Install and update Nix-on-Droid without granting root access.
 2. Run the locked install, typecheck, unit, production build, database doctor, security check, flake check and package build commands where the device supports them.
-3. Start the packaged control plane and deploy `examples/hello-nixhost`.
+3. Start the packaged control plane and deploy `examples/hello-flake`.
 4. Run version-controlled Maestro flows against the Android browser for first-run setup, login/logout, role restrictions, GitHub authorization handoff, application creation, deployment and error states.
 5. Verify access from a second LAN device and through an authenticated
    operator-owned Cloudflare hostname.

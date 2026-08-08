@@ -30,9 +30,9 @@ describe("backup and restore", () => {
       keyMode: string;
       files: Record<string, unknown>;
     };
-    expect(manifest.format).toBe("nixhost-backup");
+    expect(manifest.format).toBe("platform-backup");
     expect(manifest.keyMode).toBe("external");
-    expect(Object.keys(manifest.files).sort()).toEqual(["applications.tar.gz", "nixhost.sqlite"]);
+    expect(Object.keys(manifest.files).sort()).toEqual(["applications.tar.gz", "platform.sqlite"]);
   });
 
   it("rejects a modified archive before replacing current application state", () => {
@@ -55,7 +55,7 @@ describe("backup and restore", () => {
 });
 
 function temporaryRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-backup-test-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "platform-backup-test-"));
   roots.push(root);
   return root;
 }
@@ -75,8 +75,8 @@ function runScript(
       timeout: 30_000,
       env: {
         ...process.env,
-        NIXHOST_DATA_DIR: data,
-        NIXHOST_MASTER_KEY: masterKey,
+        PLATFORM_DATA_DIR: data,
+        PLATFORM_MASTER_KEY: masterKey,
       },
     },
   );

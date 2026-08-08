@@ -1,5 +1,5 @@
 {
-  description = "NixHost — LAN-first Next.js control plane for Nix flake applications";
+  description = "Nix Ship — LAN-first Next.js control plane for Nix flake applications";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -21,17 +21,17 @@
             sqlite
             gnutar
           ];
-          mkNixHostShell = packages: pkgs.mkShell {
+          mkNixShipShell = packages: pkgs.mkShell {
             inherit packages;
             shellHook = ''
-              export NIXHOST_DATA_DIR="''${NIXHOST_DATA_DIR:-$PWD/.local-data}"
-              echo "NixHost development shell (${system})"
+              export PLATFORM_DATA_DIR="''${PLATFORM_DATA_DIR:-$PWD/.local-data}"
+              echo "Nix Ship development shell (${system})"
               echo "Run: pnpm install && pnpm dev"
             '';
           };
         in {
-          default = mkNixHostShell basePackages;
-          android = mkNixHostShell (basePackages ++ (with pkgs; [
+          default = mkNixShipShell basePackages;
+          android = mkNixShipShell (basePackages ++ (with pkgs; [
             android-tools
             curl
             jdk21_headless
@@ -44,7 +44,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
         in {
-          default = import ./nixhost.nix {
+          default = import ./nixship.nix {
             inherit pkgs self systems;
           };
         });
@@ -52,7 +52,7 @@
       apps = forAllSystems (system: {
         default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/nixhost";
+          program = "${self.packages.${system}.default}/bin/nixship";
         };
       });
     };

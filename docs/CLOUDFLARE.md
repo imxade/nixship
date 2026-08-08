@@ -1,44 +1,45 @@
 # Cloudflare
 
-Cloudflare has two independent roles in NixHost:
+Cloudflare has two independent roles in Nix Ship:
 
-1. **Automatic temporary access.** On startup, NixHost supervises one account-free
-   Quick Tunnel for the dashboard and one for every web application. No Cloudflare
+1. **Automatic temporary access.** On startup, Nix Ship supervises one account-free
+   Quick Tunnel for the dashboard and one for every active web deployment. No Cloudflare
    login, OAuth client, API token, domain, public IP, or router port forwarding is
    required. The dashboard and application pages show every current LAN, temporary,
    and custom-domain link as a clickable URL.
-2. **Persistent custom domains.** After Cloudflare authorization, NixHost creates and
+2. **Persistent custom domains.** After Cloudflare authorization, Nix Ship creates and
    supervises one named tunnel, DNS records, the dashboard hostname, and application
-   ingress rules from inside the NixHost UI. The operator must already own a domain
+   ingress rules from inside the Nix Ship UI. The operator must already own a domain
    whose DNS zone is active in the authorized Cloudflare account.
 
 Quick Tunnel and named-tunnel routes coexist. Adding `console.example.com` or
 `app.example.com` does not stop the corresponding `trycloudflare.com` process.
-Quick Tunnel URLs normally remain unchanged while NixHost and the corresponding
-`cloudflared` process keep running. A graceful NixHost shutdown closes managed Quick
+Quick Tunnel URLs normally remain unchanged while Nix Ship and the corresponding
+`cloudflared` process keep running. A graceful Nix Ship shutdown closes managed Quick
 Tunnels. A crash, device reboot, process termination, or later recreation can produce
 a different URL.
 
 ## Quick Tunnel operating contract
 
-- Quick Tunnels are enabled by default. Set `NIXHOST_QUICK_TUNNELS_ENABLED=false`
+- Quick Tunnels are enabled by default. Set `QUICK_TUNNELS_ENABLED=false`
   before startup to make a node LAN/custom-domain only. Set
-  `NIXHOST_CLOUDFLARED_BIN` when `cloudflared` is not on `PATH`.
-- NixHost uses a separate Quick Tunnel process per web service. This avoids
+  `CLOUDFLARED_BIN` when `cloudflared` is not on `PATH`.
+- Nix Ship uses a separate Quick Tunnel process per active web deployment. This avoids
   path-prefix rewriting and preserves normal application assumptions about `/`,
   cookies, redirects, assets, and WebSockets.
 - Worker applications have no HTTP port and therefore receive no access URL.
-- A tunnel URL may exist while its application is stopped or a deployment failed;
-  the UI keeps the link clickable but marks the service unavailable.
+- A deployment tunnel exists only while that deployment remains active. Retention,
+  application stop, process failure, and deletion remove its tunnel state and stop
+  its owned process. Startup and public-edge failures remain visible on that deployment.
 - Quick Tunnel URLs are public bearer-like locations, **not authentication**.
-  The NixHost dashboard still requires login, but hosted applications must provide
+  The Nix Ship dashboard still requires login, but hosted applications must provide
   their own authentication when they are not intended to be public.
 - Cloudflare documents Quick Tunnels as development/testing access with no uptime
   guarantee, a 200 in-flight request limit, and no Server-Sent Events support.
-  NixHost therefore polls application state and falls back to authenticated log
+  Nix Ship therefore polls application state and falls back to authenticated log
   snapshots when live SSE is unavailable.
 
-The account-free command NixHost supervises is equivalent to:
+The account-free command Nix Ship supervises is equivalent to:
 
 ```bash
 cloudflared tunnel --config /dev/null --no-autoupdate --loglevel info \
@@ -62,7 +63,7 @@ Cloudflare setup uses two different kinds of domain:
 1. The **OAuth client and callback domain** is the stable route registered for
    Cloudflare authorization. It is not supplied by a Quick Tunnel.
 2. The **managed zones and application hostnames** are the operator-owned domains
-   NixHost publishes through the named tunnel, for example `example.com`,
+   Nix Ship publishes through the named tunnel, for example `example.com`,
    `console.example.com`, and `api.example.com`.
 
 A user who does not own a domain can still use the automatic dashboard and app
@@ -76,7 +77,7 @@ Cloudflare account.
 1. Own a registered apex domain such as `example.com`.
 2. Sign in to Cloudflare and select **Domains**.
 3. Select **Onboard a domain**.
-4. Enter the apex domain, not the future NixHost subdomain. Enter
+4. Enter the apex domain, not the future Nix Ship subdomain. Enter
    `example.com`, not `console.example.com`.
 5. Choose the DNS-record import method and a Cloudflare plan.
 6. Review every imported DNS record before changing nameservers. Cloudflare's
@@ -96,14 +97,14 @@ Cloudflare's current full-zone procedure, including the DNSSEC ordering and
 verification commands, is maintained in
 [Set up a primary zone](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/).
 
-NixHost does not register or purchase domains. It also does not migrate
+Nix Ship does not register or purchase domains. It also does not migrate
 existing DNS records. Complete and verify the Cloudflare zone first.
 
 ## Step 2 — Bootstrap the callback hostname
 
 ### Option A: bootstrap with a manual API token
 
-1. Start NixHost on the LAN and sign in as an owner or administrator.
+1. Start Nix Ship on the LAN and sign in as an owner or administrator.
 2. In Cloudflare, open **My Profile > API Tokens > Create Token > Custom
    token**.
 3. Grant only:
@@ -115,34 +116,34 @@ existing DNS records. Complete and verify the Cloudflare zone first.
    | Zone | DNS | Edit/Write |
 
 4. Restrict Account Resources to the account that will own the tunnel.
-5. Restrict Zone Resources to the zones NixHost is allowed to manage.
+5. Restrict Zone Resources to the zones Nix Ship is allowed to manage.
 6. Create the token and copy it once. Do not put it in a repository, URL or
    command history.
 7. Record the account ID and zone ID from the Cloudflare account/zone Overview
    pages.
-8. In NixHost, open **Cloudflare > Manual API token fallback**.
+8. In Nix Ship, open **Cloudflare > Manual API token fallback**.
 9. Enter the account ID, zone ID, token, a stable tunnel name such as
-   `nixhost`, and a dashboard hostname such as `console.example.com`.
+   `nixship`, and a dashboard hostname such as `console.example.com`.
 10. Select **Save manual connection**, then **Enable tunnel**.
-11. Confirm that `https://console.example.com/login` reaches NixHost before
+11. Confirm that `https://console.example.com/login` reaches Nix Ship before
     registering that URL as the OAuth callback.
 
-NixHost validates the token, account/zone relationship and tunnel-list access
+Nix Ship validates the token, account/zone relationship and tunnel-list access
 before replacing a working configuration. It then creates the named tunnel,
 its proxied CNAME and remote ingress configuration.
 
 ### Option B: bootstrap with an existing HTTPS proxy
 
 1. Choose a stable HTTPS hostname controlled by the operator.
-2. Route it to the NixHost dashboard listener at
-   `http://<nixhost-lan-address>:3000`.
+2. Route it to the Nix Ship dashboard listener at
+   `http://<nix-ship-lan-address>:3000`.
 3. Preserve the original `Host` header and normal forwarding headers.
 4. Verify the public login page and authenticated dashboard.
 5. Use
    `https://<hostname>/api/cloudflare/oauth/callback` as the registered
    redirect URI.
 
-The callback must resolve to this NixHost node. A documentation website with
+The callback must resolve to this Nix Ship node. A documentation website with
 the same publisher domain is not a substitute for the callback route.
 
 ## Step 3 — Choose a private or public OAuth client
@@ -150,14 +151,14 @@ the same publisher domain is not a substitute for the callback route.
 Cloudflare creates new OAuth clients as private:
 
 - A **private client** can be authorized only by members of its parent
-  Cloudflare account. This is appropriate for a personal NixHost node and does
+  Cloudflare account. This is appropriate for a personal Nix Ship node and does
   not require publisher-domain verification.
 - A **public client** can be authorized by Cloudflare users outside the parent
   account. Use this only for a distributed product. It requires a logo, client
   URL, scopes and verified publisher domain. Promotion to public visibility is
   permanent.
 
-Without a NixHost-owned default domain or a distributor callback relay, one
+Without a Nix Ship-owned default domain or a distributor callback relay, one
 public client cannot provide zero-touch callbacks for arbitrary operator-owned
 domains. Each exact callback URI must be registered on the client. The current
 repository does not implement a centralized OAuth relay. A per-node private
@@ -173,9 +174,9 @@ Administrator or OAuth Client Write access.
 3. Select **Create client**.
 4. Configure these values:
 
-   | Field | NixHost value |
+   | Field | Nix Ship value |
    | --- | --- |
-   | Client name | `NixHost` or a clearly node-specific name |
+   | Client name | `Nix Ship` or a clearly node-specific name |
    | Client URL | A stable HTTPS page on the publisher/operator domain |
    | Response type | `code` |
    | Grant types | `authorization_code` and `refresh_token` |
@@ -183,9 +184,9 @@ Administrator or OAuth Client Write access.
    | PKCE | Required, `S256` |
    | Redirect URI | Exact `https://console.example.com/api/cloudflare/oauth/callback` |
    | Logo | A stable HTTPS URL; required before public promotion |
-   | Allowed CORS origins | Not required by NixHost's server-side token exchange |
+   | Allowed CORS origins | Not required by Nix Ship's server-side token exchange |
 
-5. Add the minimum API scopes needed by NixHost:
+5. Add the minimum API scopes needed by Nix Ship:
 
    - Zone Read, for active-zone discovery;
    - DNS Write/Edit, for proxied CNAME creation and ownership-checked cleanup;
@@ -198,7 +199,7 @@ Administrator or OAuth Client Write access.
    Do not grant account billing, user administration, Workers, Access-policy
    write or unrelated permissions.
 7. Save the client.
-8. Copy the client ID. NixHost's PKCE client does not use or store a client
+8. Copy the client ID. Nix Ship's PKCE client does not use or store a client
    secret.
 
 Cloudflare OAuth scope identifiers are current API data, not stable labels to
@@ -242,45 +243,45 @@ Skip this step for a private, same-account client.
 The publisher domain, client identity and requested permissions appear on the
 Cloudflare consent screen. Keep the logo, policy and client pages available.
 
-## Step 6 — Configure NixHost
+## Step 6 — Configure Nix Ship
 
 Cloudflare OAuth is an optional distributor feature and is disabled by default.
 Enable it and set all three client values in the service environment before
-starting NixHost:
+starting Nix Ship:
 
 ```text
-NIXHOST_CLOUDFLARE_OAUTH_ENABLED=true
-NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID=<client ID from Cloudflare>
-NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI=https://console.example.com/api/cloudflare/oauth/callback
-NIXHOST_CLOUDFLARE_OAUTH_SCOPES=<space-delimited exact scope IDs>
+CLOUDFLARE_OAUTH_ENABLED=true
+CLOUDFLARE_OAUTH_CLIENT_ID=<client ID from Cloudflare>
+CLOUDFLARE_OAUTH_REDIRECT_URI=https://console.example.com/api/cloudflare/oauth/callback
+CLOUDFLARE_OAUTH_SCOPES=<space-delimited exact scope IDs>
 ```
 
 For example, if Cloudflare returns the IDs `scope.one`, `scope.two` and
 `scope.three`, set:
 
 ```text
-NIXHOST_CLOUDFLARE_OAUTH_SCOPES=scope.one scope.two scope.three
+CLOUDFLARE_OAUTH_SCOPES=scope.one scope.two scope.three
 ```
 
 Do not put human-readable permission labels, commas, JSON, colon-delimited
-values or a client secret in `NIXHOST_CLOUDFLARE_OAUTH_SCOPES`.
+values or a client secret in `CLOUDFLARE_OAUTH_SCOPES`.
 
-`NIXHOST_PUBLIC_URL` is optional. GitHub webhook routing automatically prefers the
+`PLATFORM_PUBLIC_URL` is optional. GitHub webhook routing automatically prefers the
 enabled custom dashboard domain, then this explicit stable origin, then the current
 dashboard Quick Tunnel URL.
 
 The Cloudflare redirect URI and the value registered on the OAuth client must
-match exactly, including scheme, host, path and port. Restart NixHost after
+match exactly, including scheme, host, path and port. Restart Nix Ship after
 changing its process environment. The **Connect Cloudflare** button remains
 unavailable until the feature switch, client ID, redirect URI and scope string
-are all present. Set `NIXHOST_CLOUDFLARE_OAUTH_ENABLED=false` to disconnect the
+are all present. Set `CLOUDFLARE_OAUTH_ENABLED=false` to disconnect the
 complete OAuth provider at one boundary. Account-free Quick Tunnels and manual
 API-token named tunnels do not depend on it and continue working.
 
 ## Step 7 — Authorize and create the persistent tunnel
 
-1. Open NixHost through the callback hostname and sign in as owner/admin. This
-   avoids returning to a public hostname without a NixHost session.
+1. Open Nix Ship through the callback hostname and sign in as owner/admin. This
+   avoids returning to a public hostname without a Nix Ship session.
 2. Open **Cloudflare** from the dashboard.
 3. Select **Connect Cloudflare**.
 4. On Cloudflare's consent screen, verify:
@@ -289,12 +290,12 @@ API-token named tunnels do not depend on it and continue working.
    - the intended Cloudflare account;
    - only the expected Zone, DNS and Tunnel/Connector permissions.
 
-5. Approve access. Cloudflare redirects the browser to the registered NixHost
+5. Approve access. Cloudflare redirects the browser to the registered Nix Ship
    callback.
-6. Back in NixHost, choose an active zone. The selected zone also determines
+6. Back in Nix Ship, choose an active zone. The selected zone also determines
    the Cloudflare account stored for this node.
 7. Enter the tunnel name. Reuse the manual-bootstrap name to retain that
-   tunnel; otherwise NixHost creates a new named tunnel.
+   tunnel; otherwise Nix Ship creates a new named tunnel.
 8. Enter the dashboard hostname, or leave it blank when the dashboard should
    remain LAN-only.
 9. Select **Create and enable tunnel**.
@@ -307,27 +308,27 @@ API-token named tunnels do not depend on it and continue working.
 
 11. Confirm the Cloudflare DNS record is a proxied CNAME targeting
     `<tunnel-uuid>.cfargotunnel.com`.
-12. Confirm `https://console.example.com` reaches the NixHost login page and
+12. Confirm `https://console.example.com` reaches the Nix Ship login page and
     that authenticated navigation works. Live logs use SSE on normal named-tunnel
     routes and automatically use the polling fallback when needed.
 
 Cloudflare documents the underlying route as a remote tunnel ingress entry plus
-a proxied CNAME. NixHost performs both operations:
+a proxied CNAME. Nix Ship performs both operations:
 [Create a remote tunnel with the API](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel-api/).
 
 ## Step 8 — Add or change the dashboard domain
 
-1. Open **Cloudflare** in NixHost.
+1. Open **Cloudflare** in Nix Ship.
 2. Find **Dashboard domain**.
 3. Enter a hostname from an active zone accessible to the stored
    authorization.
 4. Select **Save and sync dashboard**.
 5. Verify the new DNS record, tunnel state and HTTPS login page.
 
-To remove the public dashboard route, clear the hostname and save. NixHost
+To remove the public dashboard route, clear the hostname and save. Nix Ship
 removes the previous DNS record only when it still targets this node's tunnel
-and carries the `Managed by NixHost` ownership comment. It also moves the GitHub App webhook to the next available route: an explicit
-`NIXHOST_PUBLIC_URL`, then the current dashboard Quick Tunnel, or the inactive
+and carries the `Managed by Nix Ship` ownership comment. It also moves the GitHub App webhook to the next available route: an explicit
+`PLATFORM_PUBLIC_URL`, then the current dashboard Quick Tunnel, or the inactive
 sentinel when no public route remains.
 
 The dashboard hostname cannot also belong to a hosted application.
@@ -356,15 +357,15 @@ a web port and cannot have custom domains.
    - a wildcard such as `*.example.com`;
    - `localhost` or a bare single-label name.
 
-6. Add at most 20 hostnames. A hostname can belong to only one NixHost
+6. Add at most 20 hostnames. A hostname can belong to only one Nix Ship
    application. Internationalized names are stored in ASCII/Punycode form.
 7. Select **Save and sync domains**.
 8. Read the status shown beside every hostname:
 
-   - **Cloudflare managed:** NixHost found an authorized zone, synchronized the
+   - **Cloudflare managed:** Nix Ship found an authorized zone, synchronized the
      proxied CNAME and added the hostname to tunnel ingress.
    - **External DNS/TLS:** no authorized zone in the selected Cloudflare
-     account matched. NixHost did not modify DNS. Configure that provider to
+     account matched. Nix Ship did not modify DNS. Configure that provider to
      reach the application's displayed stable origin port.
    - **Awaiting sync:** the route has not completed synchronization.
    - **Cloudflare not connected:** connect Cloudflare or use another DNS/TLS
@@ -401,13 +402,13 @@ the managed tunnel CNAME and should be reviewed before synchronization.
 4. Verify that it disappears from the application's route list.
 5. Verify DNS cleanup in Cloudflare.
 
-NixHost deletes a record only when the record still points to this node's
-tunnel and its comment is `Managed by NixHost`. A changed or unowned DNS record
+Nix Ship deletes a record only when the record still points to this node's
+tunnel and its comment is `Managed by Nix Ship`. A changed or unowned DNS record
 is preserved for manual review.
 
 ## Step 11 — Protect the dashboard with Cloudflare Access
 
-NixHost authentication remains mandatory, but a public administration surface
+Nix Ship authentication remains mandatory, but a public administration surface
 should also use Cloudflare Access.
 
 1. Open Cloudflare Zero Trust.
@@ -417,7 +418,7 @@ should also use Cloudflare Access.
 5. Create an Allow policy restricted to the operator's identity, email address
    or trusted identity-provider group.
 6. Avoid broad permanent Bypass policies.
-7. Test the Access login and then the independent NixHost login in a private
+7. Test the Access login and then the independent Nix Ship login in a private
    browser window.
 8. Verify the OAuth callback while signed into Access. Cloudflare OAuth returns
    through the browser, so the operator must be able to pass the Access policy.
@@ -430,7 +431,7 @@ and
 
 ## OAuth lifecycle and secret handling
 
-NixHost generates a random ten-minute OAuth state and PKCE verifier. Only the
+Nix Ship generates a random ten-minute OAuth state and PKCE verifier. Only the
 state hash is used for lookup; the encrypted verifier is consumed exactly once
 before code exchange. Access and refresh tokens are encrypted with the node
 master key. Expiring access tokens refresh under a single in-process refresh
@@ -444,7 +445,7 @@ and zone selection APIs still require that same authenticated owner/admin.
 
 Cloudflare account administrators can disable public OAuth applications under
 the account's public-OAuth-app access settings. An operator can revoke an
-authorization from Cloudflare. Reconnect from the NixHost Cloudflare page when
+authorization from Cloudflare. Reconnect from the Nix Ship Cloudflare page when
 the grant is revoked or its refresh token expires.
 
 ## Persistent route model
@@ -456,12 +457,12 @@ console.example.com -> http://127.0.0.1:3000
 app.example.com     -> http://127.0.0.1:<stable LAN app port>
 ```
 
-NixHost creates proxied CNAME records targeting
+Nix Ship creates proxied CNAME records targeting
 `<tunnel-id>.cfargotunnel.com` and writes remotely managed ingress rules. The
-tunnel starts automatically on later NixHost boots once the owner has enabled
+tunnel starts automatically on later Nix Ship boots once the owner has enabled
 it.
 
-NixHost does not assign a default public hostname. The operator explicitly
+Nix Ship does not assign a default public hostname. The operator explicitly
 chooses every dashboard and application domain.
 
 The dashboard hostname is optional and can be added, changed or removed after
@@ -482,13 +483,13 @@ Each application's Domains tab and the Cloudflare page show:
 - `Sync failed`: Cloudflare returned an error, retained with the route.
 
 Saving project domains triggers synchronization when Cloudflare is configured.
-When a managed hostname is removed, NixHost deletes the record only if its
-target is this node's tunnel and its ownership comment is `Managed by NixHost`.
+When a managed hostname is removed, Nix Ship deletes the record only if its
+target is this node's tunnel and its ownership comment is `Managed by Nix Ship`.
 Unrelated DNS records are never deleted.
 
 ## Failure behavior
 
-If `cloudflared` exits, NixHost retries while the selected tunnel mode remains
+If `cloudflared` exits, Nix Ship retries while the selected tunnel mode remains
 enabled. LAN applications continue running. Route synchronization failure does
 not stop or redeploy applications, and a candidate Cloudflare configuration
 does not overwrite valid credentials until its access boundary is verified.
@@ -498,13 +499,13 @@ does not overwrite valid credentials until its access boundary is verified.
 ### Connect Cloudflare is unavailable
 
 Confirm that all three OAuth environment variables are non-empty in the
-NixHost process environment, then restart the packaged process. Editing
+Nix Ship process environment, then restart the packaged process. Editing
 `.env.example` does not configure a running service.
 
 ### Cloudflare reports an invalid redirect URI
 
 Compare the registered URI and
-`NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI` character for character. Check:
+`CLOUDFLARE_OAUTH_REDIRECT_URI` character for character. Check:
 
 - `https`, not `http`, for a public callback;
 - the exact hostname;
@@ -512,7 +513,7 @@ Compare the registered URI and
 - no omitted or extra port;
 - no extra trailing slash.
 
-Also confirm that the callback hostname reaches the same NixHost data directory
+Also confirm that the callback hostname reaches the same Nix Ship data directory
 where authorization was started. OAuth state is node-local and expires after
 ten minutes.
 
@@ -520,7 +521,7 @@ ten minutes.
 
 Fetch the current scope catalog from `GET /client/v4/oauth/scopes` and copy its
 `id` values. Do not translate old API-token examples into colon-delimited OAuth
-scope strings. Ensure the space-delimited NixHost scope set is identical to the
+scope strings. Ensure the space-delimited Nix Ship scope set is identical to the
 scope set allowed on the OAuth client.
 
 ### Authorization succeeds but no zones appear
@@ -551,8 +552,8 @@ runtime configuration.
 ### The tunnel remains Starting or repeatedly reconnects
 
 1. Inspect
-   `~/.local/share/nixhost/logs/cloudflared.log`, or the equivalent path under
-   `NIXHOST_DATA_DIR`.
+   `~/.local/share/nix-platform/logs/cloudflared.log`, or the equivalent path under
+   `PLATFORM_DATA_DIR`.
 2. Confirm the host can make outbound connections to Cloudflare. Cloudflare's
    tunnel guide calls out port `7844` for connectivity checks.
 3. Confirm system time and DNS resolution are correct.
@@ -563,7 +564,7 @@ runtime configuration.
 
 1. Confirm the application has a healthy active deployment.
 2. Confirm its Domains tab reports **Cloudflare managed**.
-3. Test the displayed stable LAN origin port from the NixHost device.
+3. Test the displayed stable LAN origin port from the Nix Ship device.
 4. Check deployment logs before changing DNS.
 5. Confirm Cloudflare Access is not denying the request.
 
@@ -575,7 +576,7 @@ the operator matches an Allow policy for the dashboard hostname.
 
 ### A grant was revoked or expired
 
-Open the Cloudflare page and select **Reauthorize Cloudflare**. NixHost retains
+Open the Cloudflare page and select **Reauthorize Cloudflare**. Nix Ship retains
 LAN operation while public synchronization is unavailable. If the old
 authorization must be removed immediately, revoke it from the Cloudflare
 account's authorized-application controls and restart the connection flow.

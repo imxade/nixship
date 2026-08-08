@@ -2,7 +2,7 @@
 
 ## Threat model
 
-NixHost protects the management interface and stored credentials from unauthenticated LAN clients. It does not protect the host from a malicious deployed repository, and it does not isolate one application from another.
+Nix Ship protects the management interface and stored credentials from unauthenticated LAN clients. It does not protect the host from a malicious deployed repository, and it does not isolate one application from another.
 
 ## Authentication
 
@@ -55,10 +55,10 @@ not an authorization boundary.
 
 ## Secret storage
 
-- Application values, GitHub private key/secret, Cloudflare API/tunnel tokens,
+- Application values, GitHub private key/secret, Harbur read tokens, Cloudflare API/tunnel tokens,
   OAuth PKCE verifiers and OAuth access/refresh tokens are encrypted with
   AES-256-GCM.
-- Master key comes from `NIXHOST_MASTER_KEY` or a mode-0600 local key file.
+- Master key comes from `PLATFORM_MASTER_KEY` or a mode-0600 local key file.
 - Existing values are never sent back to the dashboard.
 - Enter or rotate secrets only through an HTTPS dashboard route or a trusted private
   LAN. Plain LAN HTTP does not protect secrets in transit from observers on that
@@ -70,7 +70,7 @@ not an authorization boundary.
   feature switch and all public-client settings are present. Manual API-token
   access and account-free Quick Tunnels do not load or depend on the provider.
 - Quick Tunnels create temporary public hostnames automatically unless disabled.
-  Dashboard access still requires NixHost authentication. Hosted applications receive
+  Dashboard access still requires Nix Ship authentication. Hosted applications receive
   no automatic access control; their temporary URL must be treated as public and the
   application must implement authentication when needed.
 - Next.js is prepared before the persistent runtime starts. A framework startup
@@ -86,6 +86,13 @@ For the integrated Android app, replace the local key-file fallback with Android
 
 - Executable and argument arrays are passed directly to `spawn`.
 - Git credentials are supplied as process environment configuration, not embedded in repository URLs.
+- Harbur credentials are Bearer headers only. Harbur origins cannot contain credentials, paths,
+  queries or fragments; redirects are rejected and DNS is rechecked before each request. Public
+  destinations require HTTPS, while LAN/private access and private HTTP require an explicit owner
+  opt-in.
+- Harbur archives are content-addressed and checked for compressed, per-file, entry-count and total
+  expanded-size limits. Extraction rejects traversal, original-name sanitization, symlinks and
+  non-regular entries, verifies CRC/digest, and atomically publishes only a complete locked flake.
 - Applications receive a controlled working directory and explicit runtime variables.
 - Each application starts in a distinct POSIX process group for group termination.
 

@@ -5,19 +5,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-deployment-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "platform-deployment-"));
 const repository = path.join(root, "repository");
 const nixSystem = execFileSync(
   "nix",
   ["eval", "--impure", "--raw", "--expr", "builtins.currentSystem"],
   { encoding: "utf8" },
 ).trim();
-process.env.NIXHOST_DATA_DIR = path.join(root, "data");
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 11).toString("base64");
-process.env.NIXHOST_MIN_FREE_DISK_MB = "128";
-process.env.NIXHOST_MIN_FREE_MEMORY_MB = "64";
-process.env.NIXHOST_GIT_POLL_SECONDS = "86400";
-process.env.NIXHOST_METRICS_SECONDS = "2";
+process.env.PLATFORM_DATA_DIR = path.join(root, "data");
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 11).toString("base64");
+process.env.MIN_FREE_DISK_MB = "128";
+process.env.MIN_FREE_MEMORY_MB = "64";
+process.env.SOURCE_POLL_SECONDS = "86400";
+process.env.METRICS_INTERVAL_SECONDS = "2";
 
 const [{ PlatformRuntime }, database, appService, environment, ports, processIdentity] =
   await Promise.all([
@@ -165,8 +165,8 @@ function createFixtureRepository(target: string, healthStatus: number, version: 
   if (!fs.existsSync(path.join(target, ".git"))) {
     const serverSource = "$" + "{./server.py}";
     execFileSync("git", ["init", "--initial-branch=main", target], { stdio: "ignore" });
-    git(target, ["config", "user.email", "fixture@nixhost.invalid"]);
-    git(target, ["config", "user.name", "NixHost fixture"]);
+    git(target, ["config", "user.email", "fixture@platform.invalid"]);
+    git(target, ["config", "user.name", "Nix Ship fixture"]);
     fs.copyFileSync(path.join(process.cwd(), "flake.lock"), path.join(target, "flake.lock"));
     fs.writeFileSync(
       path.join(target, "flake.nix"),
@@ -177,12 +177,12 @@ function createFixtureRepository(target: string, healthStatus: number, version: 
       system = "${nixSystem}";
       pkgs = import nixpkgs { inherit system; };
       fixture = pkgs.writeShellApplication {
-        name = "nixhost-deployment-fixture";
+        name = "platform-deployment-fixture";
         runtimeInputs = [ pkgs.python3 pkgs.coreutils ];
         text = "exec python ${serverSource}";
       };
     in {
-      apps.\${system}.default = { type = "app"; program = "\${fixture}/bin/nixhost-deployment-fixture"; };
+      apps.\${system}.default = { type = "app"; program = "\${fixture}/bin/platform-deployment-fixture"; };
     };
 }
 `,
@@ -269,6 +269,6 @@ async function waitForDeployment(
 async function responseText(port: number, pathname = "/"): Promise<string> {
   const response = await fetch(`http://127.0.0.1:${port}${pathname}`);
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("x-nixhost-application-proxy"), "ready");
+  assert.equal(response.headers.get("x-platform-application-proxy"), "ready");
   return response.text();
 }

@@ -8,7 +8,6 @@ playwright-report/
 .env.local
 .env.*.local
 !.env.example
-.nixhost/
 .e2e-data/
 .e2e-data-*/
 .e2e-data-ci/

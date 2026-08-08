@@ -42,11 +42,11 @@ export function SetupForm({
       className="card-body gap-5 px-6 py-7 sm:px-8 sm:py-8"
     >
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Claim this NixHost</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Claim this Nix Ship</h1>
         <p className="text-base-content/70 mt-2">
           {authorized
             ? "Create the owner account for this device."
-            : "Open one of the first-run setup links printed by the NixHost process."}
+            : "Open one of the first-run setup links printed by the Nix Ship process."}
         </p>
       </div>
       {error && (

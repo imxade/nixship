@@ -12,18 +12,17 @@ import {
   matchesProcessIdentity,
   type ProcessIdentity,
 } from "./process-identity.ts";
-import { APPLICATION_PROXY_READY_HEADER, APPLICATION_PROXY_READY_VALUE } from "./proxy-manager.ts";
 import { synchronizeGitHubWebhook } from "./public-webhook.ts";
 import { parseQuickTunnelUrl } from "./quick-tunnel-url.ts";
-import type { AppRow } from "./types.ts";
 
 export type QuickTunnelStatus = "starting" | "running" | "error";
-export type QuickTunnelTargetType = "dashboard" | "application";
+export type QuickTunnelTargetType = "dashboard" | "deployment";
 
 interface QuickTunnelRow {
   key: string;
   target_type: QuickTunnelTargetType;
   app_id: string | null;
+  deployment_id: string | null;
   local_port: number;
   url: string | null;
   status: QuickTunnelStatus;
@@ -41,6 +40,7 @@ interface QuickTunnelRow {
 
 interface QuickTunnelStatusRow extends QuickTunnelRow {
   app_name: string | null;
+  commit_sha: string | null;
 }
 
 interface ManagedQuickTunnel {
@@ -55,6 +55,8 @@ interface QuickTunnelTarget {
   targetType: QuickTunnelTargetType;
   appId: string | null;
   appName: string | null;
+  deploymentId: string | null;
+  commitSha: string | null;
   localPort: number;
 }
 
@@ -63,6 +65,8 @@ export interface QuickTunnelRoute {
   targetType: QuickTunnelTargetType;
   appId: string | null;
   appName: string | null;
+  deploymentId: string | null;
+  commitSha: string | null;
   localPort: number;
   url: string | null;
   status: QuickTunnelStatus;
@@ -92,14 +96,14 @@ export class QuickTunnelController {
   ) {}
 
   async boot(): Promise<void> {
-    if (!config.NIXHOST_QUICK_TUNNELS_ENABLED) {
+    if (!config.QUICK_TUNNELS_ENABLED) {
       await this.stopAllAndClear();
       return;
     }
     await this.reconcile();
     this.timer = setInterval(
       () => void this.reconcile(),
-      config.NIXHOST_QUICK_TUNNEL_RECONCILE_SECONDS * 1000,
+      config.QUICK_TUNNEL_RECONCILE_SECONDS * 1000,
     );
     this.timer.unref();
   }
@@ -115,20 +119,23 @@ export class QuickTunnelController {
   status(): { enabled: boolean; routes: QuickTunnelRoute[] } {
     const rows = getDb()
       .prepare(
-        `SELECT q.*, a.name AS app_name
+        `SELECT q.*, a.name AS app_name, d.commit_sha
          FROM quick_tunnels q
          LEFT JOIN applications a ON a.id = q.app_id
+         LEFT JOIN deployments d ON d.id = q.deployment_id
          ORDER BY q.target_type, q.key`,
       )
       .all() as QuickTunnelStatusRow[];
     return {
-      enabled: config.NIXHOST_QUICK_TUNNELS_ENABLED,
+      enabled: config.QUICK_TUNNELS_ENABLED,
       routes: rows.map((row) => {
         return {
           key: row.key,
           targetType: row.target_type,
           appId: row.app_id,
           appName: row.app_name,
+          deploymentId: row.deployment_id,
+          commitSha: row.commit_sha,
           localPort: row.local_port,
           url: row.url,
           status: row.status,
@@ -141,21 +148,27 @@ export class QuickTunnelController {
     };
   }
 
-  applicationRoute(appId: string): QuickTunnelRoute | null {
-    return this.status().routes.find((route) => route.appId === appId) ?? null;
+  deploymentRoute(deploymentId: string): QuickTunnelRoute | null {
+    return this.status().routes.find((route) => route.deploymentId === deploymentId) ?? null;
+  }
+
+  applicationRoutes(appId: string): QuickTunnelRoute[] {
+    return this.status().routes.filter((route) => route.appId === appId);
   }
 
   async removeApplication(appId: string): Promise<void> {
-    const key = `app:${appId}`;
-    const row = getQuickTunnel(key);
-    if (!row) return;
-    await this.stopRow(row);
-    getDb().prepare("DELETE FROM quick_tunnels WHERE key = ?").run(key);
-    events.publish("quick_tunnel.removed", `app:${appId}`, { key });
+    const rows = getDb()
+      .prepare("SELECT * FROM quick_tunnels WHERE app_id = ?")
+      .all(appId) as QuickTunnelRow[];
+    for (const row of rows) {
+      await this.stopRow(row);
+      getDb().prepare("DELETE FROM quick_tunnels WHERE key = ?").run(row.key);
+      events.publish("quick_tunnel.removed", `app:${appId}`, { key: row.key });
+    }
   }
 
   async reconcile(): Promise<void> {
-    if (this.closed || !config.NIXHOST_QUICK_TUNNELS_ENABLED) return;
+    if (this.closed || !config.QUICK_TUNNELS_ENABLED) return;
     if (this.reconciliation) return this.reconciliation;
     this.reconciliation = this.reconcileOnce().finally(() => {
       this.reconciliation = null;
@@ -164,7 +177,7 @@ export class QuickTunnelController {
   }
 
   private async reconcileOnce(): Promise<void> {
-    const expected = targetMap();
+    const expected = quickTunnelTargets();
     const existing = getDb().prepare("SELECT * FROM quick_tunnels").all() as QuickTunnelRow[];
 
     for (const row of existing) {
@@ -190,10 +203,17 @@ export class QuickTunnelController {
       getDb()
         .prepare(
           `INSERT INTO quick_tunnels(
-            key, target_type, app_id, local_port, status, updated_at
-          ) VALUES (?, ?, ?, ?, 'starting', ?)`,
+            key, target_type, app_id, deployment_id, local_port, status, updated_at
+          ) VALUES (?, ?, ?, ?, ?, 'starting', ?)`,
         )
-        .run(target.key, target.targetType, target.appId, target.localPort, now);
+        .run(
+          target.key,
+          target.targetType,
+          target.appId,
+          target.deploymentId,
+          target.localPort,
+          now,
+        );
       row = getQuickTunnel(target.key);
     }
     if (!row) return;
@@ -299,7 +319,7 @@ export class QuickTunnelController {
 
     let child: ChildProcess;
     try {
-      child = spawnLogged(config.NIXHOST_CLOUDFLARED_BIN, quickTunnelArguments(target.localPort), {
+      child = spawnLogged(config.CLOUDFLARED_BIN, quickTunnelArguments(target.localPort), {
         cwd: paths.data,
         env: process.env,
         stdoutPath: log,
@@ -444,26 +464,42 @@ export class QuickTunnelController {
   }
 }
 
-function targetMap(): Map<string, QuickTunnelTarget> {
+export function quickTunnelTargets(): Map<string, QuickTunnelTarget> {
   const targets = new Map<string, QuickTunnelTarget>();
   targets.set("dashboard", {
     key: "dashboard",
     targetType: "dashboard",
     appId: null,
     appName: null,
+    deploymentId: null,
+    commitSha: null,
     localPort: config.PORT,
   });
-  const apps = getDb()
-    .prepare("SELECT * FROM applications WHERE kind = 'web' AND public_port IS NOT NULL")
-    .all() as AppRow[];
-  for (const app of apps) {
-    if (!app.public_port) continue;
-    targets.set(`app:${app.id}`, {
-      key: `app:${app.id}`,
-      targetType: "application",
-      appId: app.id,
-      appName: app.name,
-      localPort: app.public_port,
+  const deployments = getDb()
+    .prepare(
+      `SELECT d.id, d.app_id, d.commit_sha, d.internal_port, a.name AS app_name
+       FROM deployments d
+       JOIN applications a ON a.id = d.app_id
+       WHERE d.state = 'running' AND d.internal_port IS NOT NULL
+         AND a.kind = 'web' AND a.desired_state = 'running'
+       ORDER BY d.activated_at, d.queued_at, d.id`,
+    )
+    .all() as Array<{
+    id: string;
+    app_id: string;
+    commit_sha: string | null;
+    internal_port: number;
+    app_name: string;
+  }>;
+  for (const deployment of deployments) {
+    targets.set(`deployment:${deployment.id}`, {
+      key: `deployment:${deployment.id}`,
+      targetType: "deployment",
+      appId: deployment.app_id,
+      appName: deployment.app_name,
+      deploymentId: deployment.id,
+      commitSha: deployment.commit_sha,
+      localPort: deployment.internal_port,
     });
   }
   return targets;
@@ -554,7 +590,7 @@ export function cloudflaredStartError(error: unknown): string {
     message.includes("ENOENT") ||
     (error instanceof Error && "code" in error && error.code === "ENOENT")
   ) {
-    return "Missing dependency: cloudflared. Install cloudflared or set NIXHOST_CLOUDFLARED_BIN to its absolute path.";
+    return "Missing dependency: cloudflared. Install cloudflared or set CLOUDFLARED_BIN to its absolute path.";
   }
   return `Unable to start cloudflared: ${message}`;
 }
@@ -621,7 +657,7 @@ export async function quickTunnelRouteIsReachable(
       signal: AbortSignal.timeout(EDGE_QUERY_TIMEOUT_MS),
     });
     if (targetType === "dashboard") return response.status === 200;
-    return response.headers.get(APPLICATION_PROXY_READY_HEADER) === APPLICATION_PROXY_READY_VALUE;
+    return response.status >= 200 && response.status < 500;
   } catch {
     return false;
   }

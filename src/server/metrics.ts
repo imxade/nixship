@@ -17,7 +17,7 @@ export class MetricsCollector {
   private readonly previousCpu = new Map<number, CpuSample>();
 
   boot(): void {
-    this.timer = setInterval(() => this.collect(), config.NIXHOST_METRICS_SECONDS * 1000);
+    this.timer = setInterval(() => this.collect(), config.METRICS_INTERVAL_SECONDS * 1000);
     this.timer.unref();
     this.collect();
   }

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import { BRAND_MARK_PATH, PRODUCT_NAME } from "@/lib/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "NixHost", template: "%s · NixHost" },
+  title: { default: PRODUCT_NAME, template: `%s · ${PRODUCT_NAME}` },
   description: "LAN-first control plane for trusted Nix flake deployments.",
   icons: {
-    icon: [{ url: "/nixhost-mark.svg", type: "image/svg+xml" }],
-    shortcut: "/nixhost-mark.svg",
+    icon: [{ url: BRAND_MARK_PATH, type: "image/png" }],
+    shortcut: BRAND_MARK_PATH,
   },
 };
 

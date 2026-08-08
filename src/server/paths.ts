@@ -2,12 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const defaultDataDir = path.join(os.homedir(), ".local", "share", "nixhost");
+const defaultDataDir = path.join(os.homedir(), ".local", "share", "nix-platform");
 
 export const paths = {
-  data: path.resolve(/*turbopackIgnore: true*/ process.env.NIXHOST_DATA_DIR || defaultDataDir),
+  data: path.resolve(/*turbopackIgnore: true*/ process.env.PLATFORM_DATA_DIR || defaultDataDir),
   get database() {
-    return path.join(this.data, "nixhost.sqlite");
+    return path.join(this.data, "platform.sqlite");
   },
   get repositories() {
     return path.join(this.data, "repositories");

@@ -17,7 +17,7 @@ case "$flow" in
     done
     setup_url_pattern='^https?://[^[:space:]]+/api/setup/claim\?token=[A-Za-z0-9_-]+$'
     if [[ ! "$SETUP_URL" =~ $setup_url_pattern ]]; then
-      echo "SETUP_URL must be a complete NixHost first-run setup URL." >&2
+      echo "SETUP_URL must be a complete Nix Ship first-run setup URL." >&2
       exit 2
     fi
     ;;
@@ -75,10 +75,10 @@ fi
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 safe_serial="${serial//[^A-Za-z0-9._-]/_}"
-evidence_directory="${NIXHOST_ANDROID_EVIDENCE_DIR:-$PWD/artifacts/android}/maestro-$device_mode-$safe_serial-$timestamp"
+evidence_directory="${ANDROID_EVIDENCE_DIR:-$PWD/artifacts/android}/maestro-$device_mode-$safe_serial-$timestamp"
 mkdir -p "$evidence_directory"
 
-origin_mode="${NIXHOST_MAESTRO_ORIGIN:-device}"
+origin_mode="${MAESTRO_ORIGIN:-device}"
 case "$origin_mode" in
   device)
     adb -s "$serial" forward tcp:3001 tcp:3001
@@ -93,7 +93,7 @@ case "$origin_mode" in
     trap 'adb -s "$serial" reverse --remove tcp:3001 >/dev/null 2>&1 || true' EXIT
     ;;
   *)
-    echo "NIXHOST_MAESTRO_ORIGIN must be device or host." >&2
+    echo "MAESTRO_ORIGIN must be device or host." >&2
     exit 2
     ;;
 esac
@@ -123,7 +123,7 @@ maestro_arguments=(
   --output "$evidence_directory/report.xml"
   --test-output-dir "$evidence_directory/screenshots"
   -e "BROWSER_APP_ID=$browser_app_id"
-  -e "NIXHOST_URL=http://127.0.0.1:3001"
+  -e "PLATFORM_URL=http://127.0.0.1:3001"
 )
 if [[ "$flow" == "first-run-setup" ]]; then
   maestro_arguments+=(

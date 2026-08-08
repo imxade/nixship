@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { queueDeployment } from "@/server/app-service";
+import { getApplication, queueDeployment } from "@/server/app-service";
 import { requireRole } from "@/server/auth";
 import { events } from "@/server/events";
+import { latestHarburRevision } from "@/server/harbur";
 import { api, readJson } from "@/server/http";
 import { requestUser } from "@/server/next-auth";
 
@@ -24,9 +25,13 @@ export async function POST(request: NextRequest, context: Context) {
     requireRole(user, ["owner", "admin", "operator"]);
     const { id } = await context.params;
     const input = schema.parse(await readJson(request));
+    const app = getApplication(id);
+    const commitSha =
+      input.commitSha ??
+      (app.source_provider === "harbur" ? await latestHarburRevision(app) : null);
     const deployment = queueDeployment(id, {
-      commitSha: input.commitSha,
-      requestedRef: input.commitSha ?? undefined,
+      commitSha,
+      requestedRef: commitSha ?? undefined,
       trigger: "manual",
     });
     events.publish("deployment.queued", `app:${id}`, {

@@ -1,5 +1,5 @@
 try {
-  const saved = localStorage.getItem("nixhost-theme");
+  const saved = localStorage.getItem("platform-theme");
   const theme =
     saved === "cupcake" || saved === "dracula"
       ? saved

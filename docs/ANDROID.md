@@ -2,7 +2,7 @@
 
 ## What works
 
-On a supported 64-bit ARM Android device, Nix-on-Droid can provide Nix, Node.js, Git and cloudflared in user space. NixHost can run as a LAN web service and supervise compatible `aarch64-linux` flake applications.
+On a supported 64-bit ARM Android device, Nix-on-Droid can provide Nix, Node.js, Git and cloudflared in user space. Nix Ship can run as a LAN web service and supervise compatible `aarch64-linux` flake applications.
 
 ## What it is not
 
@@ -28,7 +28,7 @@ On a supported 64-bit ARM Android device, Nix-on-Droid can provide Nix, Node.js,
 2. Complete its Nix bootstrap.
 3. Clone this repository and enter its locked `nix develop` shell.
 4. Run `scripts/android/run-nix-on-droid.sh verify` to validate the package and capture evidence.
-5. Start NixHost with a wake lock. The test-only `serve-ci` mode is loopback-only and exists solely for Maestro acceptance.
+5. Start Nix Ship with a wake lock. The test-only `serve-ci` mode is loopback-only and exists solely for Maestro acceptance.
 6. Open the displayed LAN address from another device.
 7. From the controller, enter `nix develop .#android`; this locked shell supplies
    Maestro, ADB, Java, curl, and yq.
@@ -38,7 +38,7 @@ On a supported 64-bit ARM Android device, Nix-on-Droid can provide Nix, Node.js,
    retain the generated `artifacts/android/` evidence.
 
 For UI development only, `scripts/android/run-maestro.sh ci-login
-development-emulator` may target an emulator and a controller-hosted NixHost
+development-emulator` may target an emulator and a controller-hosted Nix Ship
 origin. Its evidence is marked `release_evidence=false`. The default `physical`
 mode requires an attached physical ARM64 device and remains the only mode that
 can contribute to Android release evidence.
@@ -49,9 +49,9 @@ can contribute to Android release evidence.
 - Install dependencies using the Nix-on-Droid shell.
 - Create the `.env` and other configuration files required by the project.
 - Add a persistent Android foreground service with a notification that keeps
-  the NixHost control plane running.
+  the Nix Ship control plane running.
 - Replace the default launcher UI with a WebView that directly displays the
-  NixHost web interface.
+  Nix Ship web interface.
 - Open the generated one-time setup URL in the WebView during initial account
   creation. The URL establishes the claim cookie; no token field or manual
   copy-paste step exists.

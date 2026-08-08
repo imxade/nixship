@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-cloudflare-test-"));
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 29).toString("base64");
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-cloudflare-test-"));
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 29).toString("base64");
 
 const [{ CloudflareController }, database, secrets] = await Promise.all([
   import("../../src/server/cloudflare.ts"),
@@ -39,14 +39,14 @@ const cloudflareFetch = vi.fn(async (input: string | URL | Request, init?: Reque
       result = [{ id: "foreign-record", content: "tunnel-id.cfargotunnel.com", comment: null }];
     } else if (hostname === "changed.example.com") {
       result = [
-        { id: "changed-record", content: "other.example.net", comment: "Managed by NixHost" },
+        { id: "changed-record", content: "other.example.net", comment: "Managed by Nix Ship" },
       ];
     } else if (hostname?.endsWith(".example.com")) {
       result = [
         {
           id: "dns-record",
           content: "tunnel-id.cfargotunnel.com",
-          comment: "Managed by NixHost",
+          comment: hostname === "stale.example.com" ? "Managed by Nix Ship" : "Managed by Nix Ship",
         },
       ];
     } else {
@@ -81,7 +81,7 @@ db.prepare(
   `INSERT INTO cloudflare_config(
     singleton, account_id, zone_id, api_token_encrypted, tunnel_id, tunnel_name,
     tunnel_token_encrypted, enabled, created_at, updated_at
-  ) VALUES (1, 'account', 'zone-primary', ?, 'tunnel-id', 'nixhost', ?, 1, ?, ?)`,
+  ) VALUES (1, 'account', 'zone-primary', ?, 'tunnel-id', 'nixship', ?, 1, ?, ?)`,
 ).run(
   secrets.encryptSecret("cloudflare-test-token"),
   secrets.encryptSecret("tunnel-test-token"),
@@ -102,7 +102,7 @@ describe("Cloudflare application routes", () => {
       accountId: "account",
       zoneId: "zone-primary",
       apiToken: "replacement-test-token",
-      tunnelName: "nixhost",
+      tunnelName: "nixship",
     });
 
     expect(apiCalls.some((call) => call.url.endsWith("/user/tokens/verify"))).toBe(true);
@@ -121,7 +121,7 @@ describe("Cloudflare application routes", () => {
         accountId: "other-account",
         zoneId: "zone-primary",
         apiToken: "replacement-test-token",
-        tunnelName: "nixhost",
+        tunnelName: "nixship",
       }),
     ).rejects.toMatchObject({
       status: 400,
@@ -145,7 +145,7 @@ describe("Cloudflare application routes", () => {
         accountId: "account",
         zoneId: "zone-primary",
         apiToken: "candidate-test-token",
-        tunnelName: "nixhost",
+        tunnelName: "nixship",
         dashboardHostname: "console.example.com",
       }),
     ).rejects.toMatchObject({ code: "cloudflare_api_failed" });
@@ -203,6 +203,7 @@ describe("Cloudflare application routes", () => {
     );
     insertStatus.run("foreign.example.com", now);
     insertStatus.run("changed.example.com", now);
+    insertStatus.run("stale.example.com", now);
     await controller.syncIngress();
 
     expect(controller.status().routes).toEqual([]);
@@ -211,7 +212,8 @@ describe("Cloudflare application routes", () => {
       apiCalls.some(
         (call) =>
           call.init?.method === "DELETE" &&
-          call.url.endsWith("/zones/zone-primary/dns_records/dns-record"),
+          call.url.endsWith("/zones/zone-primary/dns_records/dns-record") &&
+          call.url.includes("stale.example.com") === false,
       ),
     ).toBe(true);
     expect(

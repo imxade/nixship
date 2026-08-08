@@ -4,6 +4,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { expect, test, type WebSocket } from "@playwright/test";
 
 test("custom development server completes the Next.js HMR WebSocket upgrade", async ({ page }) => {
@@ -25,7 +26,7 @@ test("custom development server completes the Next.js HMR WebSocket upgrade", as
   });
 
   await page.goto("/setup");
-  await expect(page.getByRole("heading", { name: "Claim this NixHost" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Claim this Nix Ship" })).toBeVisible();
   await expect.poll(() => hmrSocket?.url()).toContain("/_next/webpack-hmr");
   await Promise.race([
     receivedFrame,
@@ -49,7 +50,7 @@ test("custom development server completes the Next.js HMR WebSocket upgrade", as
 });
 
 test("a Next.js startup failure occurs before the persistent runtime starts", () => {
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-startup-collision-"));
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "platform-startup-collision-"));
   const dataDirectory = path.join(temporaryRoot, "data");
   try {
     const result = spawnSync("pnpm", ["dev"], {
@@ -60,12 +61,12 @@ test("a Next.js startup failure occurs before the persistent runtime starts", ()
         ...process.env,
         HOSTNAME: "127.0.0.1",
         PORT: "39999",
-        NIXHOST_DATA_DIR: dataDirectory,
-        NIXHOST_QUICK_TUNNELS_ENABLED: "false",
+        PLATFORM_DATA_DIR: dataDirectory,
+        QUICK_TUNNELS_ENABLED: "false",
       },
     });
     expect(result.status).not.toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toContain(
+    expect(stripVTControlCharacters(`${result.stdout}\n${result.stderr}`)).toContain(
       "Another next dev server is already running",
     );
     expect(fs.existsSync(dataDirectory)).toBe(false);

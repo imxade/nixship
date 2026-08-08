@@ -14,15 +14,9 @@ describe("LAN URL selection", () => {
   });
 
   it("uses an explicit platform-provided address without native discovery", () => {
-    expect(
-      lanHttpUrls(
-        3000,
-        undefined,
-        null,
-        "192.168.20.41",
-        true,
-      ),
-    ).toEqual(["http://192.168.20.41:3000"]);
+    expect(lanHttpUrls(3000, undefined, null, "192.168.20.41", true)).toEqual([
+      "http://192.168.20.41:3000",
+    ]);
   });
 
   it("returns no LAN URL when unsafe discovery is disabled and no address is available", () => {

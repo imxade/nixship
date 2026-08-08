@@ -2,6 +2,7 @@ export type Role = "owner" | "admin" | "operator" | "viewer";
 export type DesiredState = "running" | "stopped";
 export type AppKind = "web" | "worker";
 export type RestartPolicy = "never" | "on-failure" | "always" | "unless-stopped";
+export type SourceProvider = "github" | "harbur";
 export type DeploymentState =
   | "queued"
   | "preparing"
@@ -45,6 +46,9 @@ export interface AppRow {
   repository_url: string;
   branch: string;
   flake_output: string;
+  source_provider: SourceProvider;
+  source_repository_id: string | null;
+  source_connection_id: string | null;
   github_repository_id: number | null;
   github_installation_id: number | null;
   auto_deploy: number;
@@ -56,6 +60,19 @@ export interface AppRow {
   public_port: number | null;
   active_internal_port: number | null;
   active_deployment_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationConnectionRow {
+  id: string;
+  provider: "harbur";
+  base_url: string;
+  token_encrypted: string | null;
+  allow_private_network: number;
+  event_cursor: number;
+  status: "connected" | "error";
+  last_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +101,13 @@ export interface DeploymentRow {
   finished_at: string | null;
   activated_at: string | null;
   cancel_requested: number;
+}
+
+export interface DeploymentWithAppRow extends DeploymentRow {
+  app_name: string;
+  app_kind: AppKind;
+  app_desired_state: DesiredState;
+  app_active_deployment_id: string | null;
 }
 
 export interface RuntimeMetric {

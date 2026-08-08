@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { BrandMark } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -8,6 +9,7 @@ const items = [
   ["/apps", "Applications", "apps"],
   ["/deployments", "Deployments", "deployments"],
   ["/integrations/github", "GitHub", "github"],
+  ["/integrations/harbur", "Harbur", "harbur"],
   ["/integrations/cloudflare", "Cloudflare", "cloud"],
   ["/users", "Users", "users"],
   ["/account", "Account", "account"],
@@ -26,19 +28,19 @@ export function DashboardShell({
   const pathname = usePathname();
   return (
     <div className="drawer lg:drawer-open min-h-screen">
-      <input id="nixhost-drawer" type="checkbox" className="drawer-toggle" />
+      <input id="platform-drawer" type="checkbox" className="drawer-toggle" />
       <div className="dashboard-surface drawer-content flex min-h-screen min-w-0 flex-col">
         <header className="navbar sticky top-0 z-20 gap-2 border-b border-base-300 bg-base-100/95 px-3 backdrop-blur lg:hidden">
           <label
-            htmlFor="nixhost-drawer"
+            htmlFor="platform-drawer"
             className="btn btn-square btn-ghost"
             aria-label="Open navigation"
           >
             ☰
           </label>
           <Link href="/apps" className="flex min-w-0 flex-1 items-center gap-2.5">
-            <BrandMark className="size-8 shrink-0 shadow-sm" />
-            <span className="truncate text-xl font-bold tracking-tight">NixHost</span>
+            <BrandMark className="size-8 shrink-0 drop-shadow-sm" />
+            <span className="truncate text-xl font-bold tracking-tight">{PRODUCT_NAME}</span>
           </Link>
           <ThemeToggle compact />
         </header>
@@ -47,12 +49,12 @@ export function DashboardShell({
         </main>
       </div>
       <aside className="drawer-side z-30">
-        <label htmlFor="nixhost-drawer" aria-label="Close navigation" className="drawer-overlay" />
+        <label htmlFor="platform-drawer" aria-label="Close navigation" className="drawer-overlay" />
         <div className="flex min-h-full w-72 flex-col border-r border-base-300 bg-base-100/95 p-4 shadow-2xl backdrop-blur lg:shadow-none">
           <Link href="/apps" className="flex items-center gap-3 px-3 py-4">
-            <BrandMark className="size-10 shrink-0 shadow-sm" />
+            <BrandMark className="size-10 shrink-0 drop-shadow-sm" />
             <div>
-              <div className="text-xl font-bold">NixHost</div>
+              <div className="text-xl font-bold">{PRODUCT_NAME}</div>
               <div className="text-xs text-base-content/60">LAN deployment control plane</div>
             </div>
           </Link>
@@ -118,6 +120,12 @@ function NavIcon({ name }: { name: NavIconName }) {
     ),
     github: (
       <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7.4A5.8 5.8 0 0 0 19.3 3 5.4 5.4 0 0 0 19.1-.9S17.9-1.3 15 1a13.4 13.4 0 0 0-6 0C6.1-1.3 4.9-.9 4.9-.9A5.4 5.4 0 0 0 4.7 3a5.8 5.8 0 0 0-1.5 4.1c0 5.8 3.5 7 6.8 7.4A4.8 4.8 0 0 0 9 18v4" />
+    ),
+    harbur: (
+      <>
+        <path d="M4 18h16M6 18l2-8h8l2 8M9 10V6h6v4" />
+        <path d="M3 21c2-1 4-1 6 0s4 1 6 0 4-1 6 0" />
+      </>
     ),
     cloud: <path d="M17.5 19H6a4 4 0 0 1-.5-8A6.5 6.5 0 0 1 18 9a5 5 0 0 1-.5 10Z" />,
     users: (

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { apiFetch, formatBytes } from "@/lib/client-api";
 import { type AccessLink, AccessLinks } from "./access-links";
 import { PageHeading } from "./page-heading";
@@ -21,6 +21,7 @@ type Status = {
     loadAverage: number[];
     uptimeSeconds: number;
   };
+  settings: { activeDeploymentLimit: number };
   github: {
     connected: boolean;
     webhookRoute: null | { baseUrl: string; kind: string; stable: boolean };
@@ -37,6 +38,7 @@ type Status = {
 export function SystemClient() {
   const [data, setData] = useState<Status | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try {
       setData(await apiFetch<Status>("/api/system/status"));
@@ -57,6 +59,23 @@ export function SystemClient() {
       clearInterval(timer);
     };
   }, [load]);
+  async function saveDeploymentLimit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await apiFetch("/api/system/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ activeDeploymentLimit: form.get("activeDeploymentLimit") }),
+      });
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save deployment retention");
+    } finally {
+      setBusy(false);
+    }
+  }
   const dashboardTunnel =
     data?.quickTunnels.routes.find((route) => route.targetType === "dashboard") ?? null;
   const activeTemporaryRoutes =
@@ -90,7 +109,7 @@ export function SystemClient() {
               <AccessLinks links={data.accessLinks} />
               <QuickTunnelNotice
                 route={dashboardTunnel}
-                activeMessage="This temporary URL is public, but the dashboard still requires NixHost authentication."
+                activeMessage="This temporary URL is public, but the dashboard still requires Nix Ship authentication."
               />
             </div>
           </section>
@@ -118,6 +137,33 @@ export function SystemClient() {
               </div>
             </div>
           </div>
+          <section className="card mb-6 border border-base-300 bg-base-100">
+            <div className="card-body">
+              <h2 className="card-title">Active deployment retention</h2>
+              <p className="text-sm text-base-content/65">
+                This global limit is applied independently to each project. When a project exceeds
+                it, the oldest active deployment and its temporary tunnel are stopped while history
+                remains available.
+              </p>
+              <form onSubmit={saveDeploymentLimit} className="mt-2 flex flex-wrap items-end gap-3">
+                <label className="form-control max-w-xs">
+                  <span className="label-text mb-1">Active deployments per project</span>
+                  <input
+                    name="activeDeploymentLimit"
+                    type="number"
+                    min="1"
+                    max="20"
+                    required
+                    defaultValue={data.settings.activeDeploymentLimit}
+                    className="input input-bordered"
+                  />
+                </label>
+                <button type="submit" disabled={busy} className="btn btn-primary">
+                  {busy ? <span className="loading loading-spinner" /> : "Save limit"}
+                </button>
+              </form>
+            </div>
+          </section>
           <div className="grid min-w-0 gap-5 lg:grid-cols-2">
             <div className="card min-w-0 overflow-hidden border border-base-300 bg-base-100">
               <div className="card-body">

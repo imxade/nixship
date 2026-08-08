@@ -18,7 +18,7 @@ interface Listener {
   sockets: Set<Socket>;
 }
 
-export const APPLICATION_PROXY_READY_HEADER = "x-nixhost-application-proxy";
+export const APPLICATION_PROXY_READY_HEADER = "x-platform-application-proxy";
 export const APPLICATION_PROXY_READY_VALUE = "ready";
 
 export class ProxyManager {

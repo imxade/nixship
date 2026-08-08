@@ -4,15 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-cloudflare-oauth-test-"));
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 21).toString("base64");
-process.env.NIXHOST_CLOUDFLARE_OAUTH_CLIENT_ID = "cloudflare-public-client";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_REDIRECT_URI =
-  "http://127.0.0.1:3000/api/cloudflare/oauth/callback";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_SCOPES =
-  "account:cloudflare_tunnel:edit zone:zone:read zone:dns:edit";
-process.env.NIXHOST_CLOUDFLARE_OAUTH_ENABLED = "true";
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-cloudflare-oauth-test-"));
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 21).toString("base64");
+process.env.CLOUDFLARE_OAUTH_CLIENT_ID = "cloudflare-public-client";
+process.env.CLOUDFLARE_OAUTH_REDIRECT_URI = "http://127.0.0.1:3000/api/cloudflare/oauth/callback";
+process.env.CLOUDFLARE_OAUTH_SCOPES = "account:cloudflare_tunnel:edit zone:zone:read zone:dns:edit";
+process.env.CLOUDFLARE_OAUTH_ENABLED = "true";
 
 const tokenRequests: URLSearchParams[] = [];
 const cloudflareFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {

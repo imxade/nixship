@@ -3,7 +3,7 @@
 - Android hosting is best effort and can be terminated by the OS or OEM policy.
 - Force-stopped Android applications cannot restart themselves.
 - Nix-on-Droid is not NixOS and does not provide unavailable kernel features.
-- All deployed code shares the NixHost account; there is no hostile workload isolation.
+- All deployed code shares the Nix Ship account; there is no hostile workload isolation.
 - The initial resource model reports usage but does not enforce hard per-app CPU or memory limits.
 - Arbitrary outbound network usage is not attributed per application.
 - LAN access always has stable per-app ports. Automatic Quick Tunnels provide
@@ -17,9 +17,10 @@
 - Host-based custom-domain routing on the dashboard listener handles ordinary HTTP; use the stable per-app port or Cloudflare route for WebSocket origins.
 - Quick Tunnels are intended by Cloudflare for development/testing, have no uptime
   guarantee, cap concurrent in-flight requests, and do not support Server-Sent Events.
-  NixHost uses polling fallbacks, but these URLs are not production SLAs.
-- Every web application uses a separate Quick Tunnel process. This avoids proxy
-  compatibility problems but adds CPU/memory overhead that grows with app count.
+  Nix Ship uses polling fallbacks, but these URLs are not production SLAs.
+- Every active web deployment uses a separate Quick Tunnel process. This avoids proxy
+  compatibility problems but adds CPU/memory overhead that grows with the configured
+  active-deployment limit and project count.
 - Quick Tunnels currently have a global opt-out, not a per-application exposure
   switch. A hosted application that should not be public must enforce its own
   authentication or the operator must disable Quick Tunnels for the node.

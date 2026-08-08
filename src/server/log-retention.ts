@@ -43,8 +43,8 @@ export class LogRetentionController {
         ).map((row) => row.id),
       );
       const result = pruneLogs(paths.logs, running, {
-        maxAgeMs: config.NIXHOST_LOG_RETENTION_DAYS * 86_400_000,
-        maxBytes: config.NIXHOST_LOG_MAX_MB * 1024 * 1024,
+        maxAgeMs: config.LOG_RETENTION_DAYS * 86_400_000,
+        maxBytes: config.LOG_MAX_MB * 1024 * 1024,
       });
       if (result.removed || result.truncated) {
         logger.info("Pruned retained logs", { ...result });

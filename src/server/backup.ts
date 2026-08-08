@@ -15,7 +15,7 @@ const backupFileSchema = z.object({
 
 const backupManifestSchema = z
   .object({
-    format: z.literal("nixhost-backup"),
+    format: z.literal("platform-backup"),
     version: z.literal(1),
     createdAt: z.string().datetime(),
     sourceDataDir: z.string().min(1),
@@ -34,10 +34,10 @@ export async function createBackup(targetValue?: string): Promise<string> {
 
   const parent = path.dirname(target);
   fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
-  const staging = fs.mkdtempSync(path.join(parent, ".nixhost-backup-"));
+  const staging = fs.mkdtempSync(path.join(parent, ".platform-backup-"));
   fs.chmodSync(staging, 0o700);
   try {
-    const databaseTarget = path.join(staging, "nixhost.sqlite");
+    const databaseTarget = path.join(staging, "platform.sqlite");
     await getDb().backup(databaseTarget);
 
     const keyMode = backupKeyMode();
@@ -60,7 +60,7 @@ export async function createBackup(targetValue?: string): Promise<string> {
       }),
     );
     const manifest: BackupManifest = {
-      format: "nixhost-backup",
+      format: "platform-backup",
       version: 1,
       createdAt: new Date().toISOString(),
       sourceDataDir: paths.data,
@@ -91,7 +91,7 @@ export function verifyBackup(sourceValue: string): BackupManifest {
   }
   if (!fs.existsSync(manifestPath)) throw new Error("Backup is missing manifest.json");
   const manifest = backupManifestSchema.parse(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
-  const expectedNames = new Set(["nixhost.sqlite", "applications.tar.gz"]);
+  const expectedNames = new Set(["platform.sqlite", "applications.tar.gz"]);
   if (manifest.keyMode === "local") expectedNames.add("master.key");
   const actualNames = new Set(Object.keys(manifest.files));
   if (
@@ -109,7 +109,7 @@ export function verifyBackup(sourceValue: string): BackupManifest {
     }
   }
   validateKeyAvailability(source, manifest.keyMode);
-  validateDatabase(path.join(source, "nixhost.sqlite"));
+  validateDatabase(path.join(source, "platform.sqlite"));
   validateApplicationArchive(path.join(source, "applications.tar.gz"));
   return manifest;
 }
@@ -125,8 +125,8 @@ export function restoreBackup(sourceValue: string): void {
   const moved: Array<{ from: string; to: string }> = [];
   const installed: string[] = [];
   try {
-    const stagedDatabase = path.join(staging, "nixhost.sqlite");
-    fs.copyFileSync(path.join(source, "nixhost.sqlite"), stagedDatabase);
+    const stagedDatabase = path.join(staging, "platform.sqlite");
+    fs.copyFileSync(path.join(source, "platform.sqlite"), stagedDatabase);
     fs.chmodSync(stagedDatabase, 0o600);
     if (manifest.keyMode === "local") {
       fs.copyFileSync(path.join(source, "master.key"), path.join(staging, "master.key"));
@@ -183,8 +183,8 @@ export function restoreBackup(sourceValue: string): void {
 }
 
 function backupKeyMode(): BackupManifest["keyMode"] {
-  if (process.env.NIXHOST_MASTER_KEY?.trim()) {
-    decodeMasterKey(process.env.NIXHOST_MASTER_KEY);
+  if (process.env.PLATFORM_MASTER_KEY?.trim()) {
+    decodeMasterKey(process.env.PLATFORM_MASTER_KEY);
     return "external";
   }
   if (fs.existsSync(paths.keyFile)) return "local";
@@ -206,9 +206,9 @@ function validateKeyAvailability(source: string, mode: BackupManifest["keyMode"]
   if (mode === "local") {
     decodeMasterKey(fs.readFileSync(path.join(source, "master.key"), "utf8"));
   } else if (mode === "external") {
-    const value = process.env.NIXHOST_MASTER_KEY;
+    const value = process.env.PLATFORM_MASTER_KEY;
     if (!value) {
-      throw new Error("This backup requires NIXHOST_MASTER_KEY to be present during restore");
+      throw new Error("This backup requires PLATFORM_MASTER_KEY to be present during restore");
     }
     decodeMasterKey(value);
   }
@@ -269,10 +269,10 @@ function ensureNoActiveRuntime(): void {
         process_command_summary: lock.commandSummary ?? null,
       })
     ) {
-      throw new Error(`Stop NixHost before restoring; the control plane PID is ${lock.pid}`);
+      throw new Error(`Stop Nix Ship before restoring; the control plane PID is ${lock.pid}`);
     }
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Stop NixHost")) throw error;
+    if (error instanceof Error && error.message.startsWith("Stop Nix Ship")) throw error;
   }
   fs.rmSync(lockPath, { force: true });
 }

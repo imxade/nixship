@@ -5,7 +5,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     const root = document.documentElement;
     const next = root.dataset.theme === "dracula" ? "cupcake" : "dracula";
     root.dataset.theme = next;
-    localStorage.setItem("nixhost-theme", next);
+    localStorage.setItem("platform-theme", next);
   }
 
   return (

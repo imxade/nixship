@@ -29,7 +29,17 @@ type GitHubStatus = {
   canManage: boolean;
   app: null | { installUrl: string };
 };
-type RepositorySource = "github" | "public";
+type HarburConnection = { id: string; baseUrl: string; status: "connected" | "error" };
+type HarburRepository = {
+  id: string;
+  owner: string;
+  name: string;
+  description: string | null;
+  visibility: "public" | "private";
+  defaultBranch: string;
+  latestSnapshot: null | { revision: string; createdAt: string };
+};
+type RepositorySource = "github" | "public" | "harbur";
 
 export function AppsClient() {
   const [apps, setApps] = useState<App[]>([]);
@@ -39,6 +49,11 @@ export function AppsClient() {
     canManage: false,
     app: null,
   });
+  const [harburConnections, setHarburConnections] = useState<HarburConnection[]>([]);
+  const [selectedHarburConnectionId, setSelectedHarburConnectionId] = useState("");
+  const [harburRepositories, setHarburRepositories] = useState<HarburRepository[]>([]);
+  const [selectedHarburRepositoryId, setSelectedHarburRepositoryId] = useState("");
+  const [harburRepositoriesLoading, setHarburRepositoriesLoading] = useState(false);
   const [repositorySource, setRepositorySource] = useState<RepositorySource>("github");
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<number | null>(null);
   const [repositoriesLoaded, setRepositoriesLoaded] = useState(false);
@@ -51,12 +66,28 @@ export function AppsClient() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const [appRows, status] = await Promise.all([
+      const [appRows, status, harburStatus] = await Promise.all([
         apiFetch<App[]>("/api/apps"),
         apiFetch<GitHubStatus>("/api/github/status"),
+        apiFetch<{ connections: HarburConnection[] }>("/api/harbur/status"),
       ]);
       setApps(appRows);
       setGithub(status);
+      setHarburConnections(harburStatus.connections);
+      setSelectedHarburConnectionId((current) =>
+        harburStatus.connections.some((connection) => connection.id === current)
+          ? current
+          : (harburStatus.connections[0]?.id ?? ""),
+      );
+      setRepositorySource((current) => {
+        if (current === "github" && !status.connected) {
+          return harburStatus.connections.length > 0 ? "harbur" : "public";
+        }
+        if (current === "harbur" && harburStatus.connections.length === 0) {
+          return status.connected ? "github" : "public";
+        }
+        return current;
+      });
       if (!status.connected) {
         setRepositories([]);
         setRepositoriesLoaded(false);
@@ -96,6 +127,31 @@ export function AppsClient() {
       setRepositoriesLoading(false);
     }
   }, []);
+  const loadHarburRepositories = useCallback(
+    async (connectionId = selectedHarburConnectionId || harburConnections[0]?.id) => {
+      if (!connectionId) return;
+      setHarburRepositoriesLoading(true);
+      setRepositoryError("");
+      try {
+        const rows = await apiFetch<HarburRepository[]>(
+          `/api/harbur/repositories?connectionId=${encodeURIComponent(connectionId)}`,
+        );
+        setHarburRepositories(rows);
+        setSelectedHarburRepositoryId((current) =>
+          rows.some((repository) => repository.id === current)
+            ? current
+            : (rows.find((repository) => repository.latestSnapshot)?.id ?? ""),
+        );
+      } catch (cause) {
+        setRepositoryError(
+          cause instanceof Error ? cause.message : "Could not load Harbur repositories",
+        );
+      } finally {
+        setHarburRepositoriesLoading(false);
+      }
+    },
+    [harburConnections, selectedHarburConnectionId],
+  );
   function openImportDialog() {
     (document.getElementById("new-app") as HTMLDialogElement).showModal();
     if (
@@ -106,11 +162,17 @@ export function AppsClient() {
     ) {
       void loadRepositories();
     }
+    if (repositorySource === "harbur" && harburRepositories.length === 0) {
+      void loadHarburRepositories();
+    }
   }
   function selectRepositorySource(source: RepositorySource) {
     setRepositorySource(source);
     if (source === "github" && github.connected && !repositoriesLoaded && !repositoriesLoading) {
       void loadRepositories();
+    }
+    if (source === "harbur" && harburRepositories.length === 0) {
+      void loadHarburRepositories();
     }
   }
   const filtered = useMemo(
@@ -129,12 +191,16 @@ export function AppsClient() {
       repositorySource === "github"
         ? repositories.find((repo) => repo.id === selectedRepositoryId)
         : undefined;
+    const selectedHarbur = harburRepositories.find(
+      (repository) => repository.id === selectedHarburRepositoryId,
+    );
     const repositoryUrl = selected?.clone_url || String(form.get("repositoryUrl") || "");
     try {
       await apiFetch<App>("/api/apps", {
         method: "POST",
         body: JSON.stringify({
           name: form.get("name"),
+          sourceProvider: repositorySource === "harbur" ? "harbur" : "github",
           repositoryUrl,
           branch: form.get("branch") || selected?.default_branch || undefined,
           flakeOutput: form.get("flakeOutput") || "default",
@@ -143,6 +209,9 @@ export function AppsClient() {
           githubRepositoryId: selected?.id ?? null,
           githubInstallationId: selected?.installation_id ?? null,
           autoDeploy: true,
+          harburConnectionId:
+            repositorySource === "harbur" ? selectedHarburConnectionId : undefined,
+          harburRepositoryId: selectedHarbur?.id,
         }),
       });
       (document.getElementById("new-app") as HTMLDialogElement | null)?.close();
@@ -157,7 +226,7 @@ export function AppsClient() {
     <>
       <PageHeading
         title="Applications"
-        description="Import a locked Nix flake. NixHost deploys it, supervises it, and shows its available access URLs."
+        description="Import a locked Nix flake. Nix Ship deploys it, supervises it, and shows its available access URLs."
         actions={
           loaded ? (
             <>
@@ -294,27 +363,35 @@ export function AppsClient() {
               <span className="label-text mb-1">Application name</span>
               <input name="name" required className="input input-bordered" placeholder="My API" />
             </label>
-            {github.connected && (
-              <fieldset className="join grid grid-cols-2">
-                <legend className="sr-only">Repository source</legend>
-                <button
-                  type="button"
-                  className={`btn join-item ${repositorySource === "github" ? "btn-active" : ""}`}
-                  aria-pressed={repositorySource === "github"}
-                  onClick={() => selectRepositorySource("github")}
-                >
-                  GitHub access
-                </button>
-                <button
-                  type="button"
-                  className={`btn join-item ${repositorySource === "public" ? "btn-active" : ""}`}
-                  aria-pressed={repositorySource === "public"}
-                  onClick={() => selectRepositorySource("public")}
-                >
-                  Public URL
-                </button>
-              </fieldset>
-            )}
+            <fieldset className="join grid grid-cols-1 sm:grid-cols-3">
+              <legend className="sr-only">Repository source</legend>
+              <button
+                type="button"
+                className={`btn join-item ${repositorySource === "github" ? "btn-active" : ""}`}
+                disabled={!github.connected}
+                aria-pressed={repositorySource === "github"}
+                onClick={() => selectRepositorySource("github")}
+              >
+                GitHub access
+              </button>
+              <button
+                type="button"
+                className={`btn join-item ${repositorySource === "public" ? "btn-active" : ""}`}
+                aria-pressed={repositorySource === "public"}
+                onClick={() => selectRepositorySource("public")}
+              >
+                Public URL
+              </button>
+              <button
+                type="button"
+                className={`btn join-item ${repositorySource === "harbur" ? "btn-active" : ""}`}
+                aria-pressed={repositorySource === "harbur"}
+                disabled={harburConnections.length === 0}
+                onClick={() => selectRepositorySource("harbur")}
+              >
+                Harbur
+              </button>
+            </fieldset>
             {github.connected &&
             repositorySource === "github" &&
             (repositoriesLoading || !repositoriesLoaded) ? (
@@ -345,6 +422,76 @@ export function AppsClient() {
                 installUrl={github.app?.installUrl}
                 onSelect={setSelectedRepositoryId}
               />
+            ) : repositorySource === "harbur" ? (
+              <div className="grid gap-3">
+                {harburConnections.length > 1 && (
+                  <label className="form-control">
+                    <span className="label-text mb-1">Harbur connection</span>
+                    <select
+                      className="select select-bordered"
+                      required
+                      value={selectedHarburConnectionId}
+                      onChange={(event) => {
+                        const connectionId = event.target.value;
+                        setSelectedHarburConnectionId(connectionId);
+                        setHarburRepositories([]);
+                        setSelectedHarburRepositoryId("");
+                        void loadHarburRepositories(connectionId);
+                      }}
+                    >
+                      {harburConnections.map((connection) => (
+                        <option key={connection.id} value={connection.id}>
+                          {connection.baseUrl}
+                          {connection.status === "error" ? " · error" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {harburRepositoriesLoading ? (
+                  <div role="status" className="grid min-h-32 place-items-center">
+                    <span className="loading loading-spinner loading-lg" />
+                  </div>
+                ) : repositoryError ? (
+                  <div className="alert alert-error">
+                    <span>{repositoryError}</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => void loadHarburRepositories()}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <label className="form-control">
+                    <span className="label-text mb-1">Harbur repository</span>
+                    <select
+                      className="select select-bordered"
+                      required
+                      value={selectedHarburRepositoryId}
+                      onChange={(event) => setSelectedHarburRepositoryId(event.target.value)}
+                    >
+                      <option value="" disabled>
+                        Select a repository with a snapshot
+                      </option>
+                      {harburRepositories.map((repository) => (
+                        <option
+                          key={repository.id}
+                          value={repository.id}
+                          disabled={!repository.latestSnapshot}
+                        >
+                          {repository.owner}/{repository.name} · {repository.visibility}
+                          {!repository.latestSnapshot ? " · no snapshot" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="label-text-alt">
+                      Merge events deploy exact immutable revisions automatically.
+                    </span>
+                  </label>
+                )}
+              </div>
             ) : (
               <>
                 {github.connected && repositorySource === "github" && (
@@ -365,7 +512,7 @@ export function AppsClient() {
                   <input
                     name="repositoryUrl"
                     type="url"
-                    required
+                    required={repositorySource === "public"}
                     className="input input-bordered"
                     placeholder="https://github.com/owner/repository.git"
                   />
@@ -382,6 +529,7 @@ export function AppsClient() {
                 <input
                   name="branch"
                   className="input input-bordered"
+                  disabled={repositorySource === "harbur"}
                   placeholder="Repository default (main fallback)"
                 />
               </label>
@@ -432,7 +580,9 @@ export function AppsClient() {
                   (github.connected &&
                     repositorySource === "github" &&
                     (!repositoriesLoaded ||
-                      (repositories.length > 0 && selectedRepositoryId === null)))
+                      (repositories.length > 0 && selectedRepositoryId === null))) ||
+                  (repositorySource === "harbur" &&
+                    (harburRepositoriesLoading || !selectedHarburRepositoryId))
                 }
                 className="btn btn-primary"
               >

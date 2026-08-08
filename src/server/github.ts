@@ -53,7 +53,7 @@ export function createManifest(baseUrl: string): {
   return {
     state,
     manifest: {
-      name: `NixHost-${new URL(baseUrl).hostname.replace(/[^a-z0-9-]/gi, "-")}-${randomToken(3)}`.slice(
+      name: `NixShip-${new URL(baseUrl).hostname.replace(/[^a-z0-9-]/gi, "-")}-${randomToken(3)}`.slice(
         0,
         34,
       ),
@@ -342,7 +342,7 @@ function githubHeaders(token?: string): HeadersInit {
     accept: "application/vnd.github+json",
     "content-type": "application/json",
     "x-github-api-version": API_VERSION,
-    "user-agent": "NixHost/0.1",
+    "user-agent": "NixShip/0.1",
     ...(token ? { authorization: `Bearer ${token}` } : {}),
   };
 }

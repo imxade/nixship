@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       webhook: {
         active: Boolean(webhookRoute),
         route: webhookRoute,
-        reconciliationSeconds: config.NIXHOST_GIT_POLL_SECONDS,
+        reconciliationSeconds: config.SOURCE_POLL_SECONDS,
       },
     };
   });

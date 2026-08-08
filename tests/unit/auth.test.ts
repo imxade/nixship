@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-auth-test-"));
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 23).toString("base64");
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-auth-test-"));
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 23).toString("base64");
 
 const [{ authenticateSession, changeOwnPassword, createSession, login }, database, cryptoModule] =
   await Promise.all([

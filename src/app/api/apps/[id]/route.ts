@@ -27,7 +27,16 @@ export async function GET(request: NextRequest, context: Context) {
     const app = getApplication(id);
     const cloudflare = runtimeInstance.cloudflare.status();
     const routes = cloudflare.routes.filter((route) => route.appId === id);
-    const quickTunnel = runtimeInstance.quickTunnels.applicationRoute(id);
+    const deployments = listDeployments(id, 30);
+    const quickTunnelByDeployment = new Map(
+      runtimeInstance.quickTunnels
+        .applicationRoutes(id)
+        .filter((route) => route.deploymentId)
+        .map((route) => [route.deploymentId, route]),
+    );
+    const quickTunnel = app.active_deployment_id
+      ? (quickTunnelByDeployment.get(app.active_deployment_id) ?? null)
+      : null;
     const operationalStatus = runtimeInstance.applicationOperationalStatus(id);
     return {
       app,
@@ -49,7 +58,11 @@ export async function GET(request: NextRequest, context: Context) {
         namedTunnelRunning: cloudflare.running,
       }),
       environment: environmentKeys(id),
-      deployments: listDeployments(id, 30),
+      deployments: deployments.map((deployment) => ({
+        ...deployment,
+        isProduction: deployment.id === app.active_deployment_id,
+        quickTunnel: quickTunnelByDeployment.get(deployment.id) ?? null,
+      })),
       metric: latestAppMetric(id),
     };
   });

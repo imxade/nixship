@@ -5,16 +5,16 @@
 }:
 let
   pnpmDeps = pkgs.fetchPnpmDeps {
-    pname = "nixhost";
+    pname = "nixship";
     version = "0.1.0";
     src = self;
     pnpm = pkgs.pnpm_10;
-    hash = "sha256-vLYeddSLBZ3WUe/bmc/lPMGFmqWrza4UYGDmuLEmrTk=";
+    hash = "sha256-tneADhv3uxI2bTIMaVSKY6nTyeKLis0shE6Bb449A8Q=";
     fetcherVersion = 3;
   };
 in
 pkgs.stdenv.mkDerivation {
-  pname = "nixhost";
+  pname = "nixship";
   version = "0.1.0";
   src = self;
   nativeBuildInputs = [
@@ -32,12 +32,12 @@ pkgs.stdenv.mkDerivation {
   '';
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/lib/nixhost $out/bin
-    cp -R .next public migrations dist-server src scripts package.json pnpm-lock.yaml node_modules $out/lib/nixhost/
-    cat > $out/bin/nixhost <<WRAPPER
+    mkdir -p $out/lib/nixship $out/bin
+    cp -R .next public migrations dist-server src scripts package.json pnpm-lock.yaml node_modules $out/lib/nixship/
+    cat > $out/bin/nixship <<WRAPPER
     #!${pkgs.runtimeShell}
     set -euo pipefail
-    cd $out/lib/nixhost
+    cd $out/lib/nixship
     export NODE_ENV=production
     export HOSTNAME="\''${HOSTNAME:-0.0.0.0}"
     export PORT="\''${PORT:-3000}"
@@ -49,21 +49,22 @@ pkgs.stdenv.mkDerivation {
     ]}:\$PATH"
     exec ${pkgs.nodejs_22}/bin/node dist-server/server.js
     WRAPPER
-    cat > $out/bin/nixhost-backup <<WRAPPER
+    cat > $out/bin/nixship-backup <<WRAPPER
     #!${pkgs.runtimeShell}
     set -euo pipefail
-    cd $out/lib/nixhost
+    cd $out/lib/nixship
     export PATH="${pkgs.lib.makeBinPath [ pkgs.gnutar ]}:\$PATH"
     exec ${pkgs.nodejs_22}/bin/node node_modules/tsx/dist/cli.mjs scripts/backup.ts "\$@"
     WRAPPER
-    cat > $out/bin/nixhost-restore <<WRAPPER
+    cat > $out/bin/nixship-restore <<WRAPPER
     #!${pkgs.runtimeShell}
     set -euo pipefail
-    cd $out/lib/nixhost
+    cd $out/lib/nixship
     export PATH="${pkgs.lib.makeBinPath [ pkgs.gnutar ]}:\$PATH"
     exec ${pkgs.nodejs_22}/bin/node node_modules/tsx/dist/cli.mjs scripts/restore.ts "\$@"
     WRAPPER
-    chmod +x $out/bin/nixhost $out/bin/nixhost-backup $out/bin/nixhost-restore
+    chmod +x $out/bin/nixship $out/bin/nixship-backup $out/bin/nixship-restore
+    ln -s nixship-backup $out/bin/platform-backup
     runHook postInstall
   '';
   doCheck = true;
@@ -75,6 +76,6 @@ pkgs.stdenv.mkDerivation {
     description = "LAN-first Next.js control plane for trusted Nix flake deployments";
     license = pkgs.lib.licenses.asl20;
     platforms = systems;
-    mainProgram = "nixhost";
+    mainProgram = "nixship";
   };
 }

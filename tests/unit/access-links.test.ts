@@ -3,10 +3,12 @@ import { applicationAccessLinks } from "../../src/server/access-links.ts";
 
 describe("application access links", () => {
   const quickTunnel = {
-    key: "app:one",
-    targetType: "application" as const,
+    key: "deployment:release-one",
+    targetType: "deployment" as const,
     appId: "one",
     appName: "Example",
+    deploymentId: "release-one",
+    commitSha: "abc123",
     localPort: 4100,
     url: "https://temporary.trycloudflare.com",
     status: "running" as const,

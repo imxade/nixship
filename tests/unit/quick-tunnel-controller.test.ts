@@ -4,12 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-quick-tunnel-state-"));
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-quick-tunnel-state-"));
 process.env.HOSTNAME = "127.0.0.1";
 process.env.PORT = "34567";
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 41).toString("base64");
-process.env.NIXHOST_QUICK_TUNNELS_ENABLED = "true";
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 41).toString("base64");
+process.env.QUICK_TUNNELS_ENABLED = "true";
 
 const [database, pathsModule, identityModule, quickTunnels] = await Promise.all([
   import("../../src/server/db.ts"),

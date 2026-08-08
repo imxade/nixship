@@ -1,11 +1,11 @@
 appId: ${BROWSER_APP_ID}
-name: NixHost CI admin login
+name: CI admin login
 tags:
   - nix-on-droid
   - ci-admin
 ---
 - launchApp
-- openLink: ${NIXHOST_URL}/login
+- openLink: ${PLATFORM_URL}/login
 - assertVisible: "Sign in"
 - tapOn: "Username"
 - inputText: "qwerty123456"
@@ -15,4 +15,4 @@ tags:
 - tapOn: "Sign in"
 - assertVisible: "Applications"
 - assertVisible: "New application"
-- takeScreenshot: "nixhost-ci-admin-applications"
+- takeScreenshot: "ci-admin-applications"

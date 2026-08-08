@@ -18,14 +18,14 @@ const server = http.createServer((request, response) => {
   if (request.method === "GET" && request.url === "/health") {
     sendJson(response, 200, {
       status: "ok",
-      app: "npm-start-nixhost",
+      app: "npm-start-flake",
     });
     return;
   }
 
   if (request.method === "GET" && request.url === "/") {
     sendJson(response, 200, {
-      message: "Hello from an npm run start app deployed by NixHost.",
+      message: "Hello from an npm run start app deployed by Nix Ship.",
       deploymentId: process.env.DEPLOYMENT_ID ?? null,
       dataDir: process.env.DATA_DIR ?? null,
     });
@@ -51,7 +51,7 @@ server.on("error", (error) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`npm-start-nixhost listening on http://${host}:${port}`);
+  console.log(`npm-start-flake listening on http://${host}:${port}`);
 });
 
 process.on("SIGINT", () => shutDown("SIGINT"));

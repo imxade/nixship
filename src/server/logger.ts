@@ -1,7 +1,7 @@
 import { config } from "./config.ts";
 
 const levels = { debug: 10, info: 20, warn: 30, error: 40 } as const;
-const threshold = levels[config.NIXHOST_LOG_LEVEL];
+const threshold = levels[config.LOG_LEVEL];
 
 type Context = Record<string, unknown>;
 
@@ -27,7 +27,7 @@ export const logger = {
     console.log(
       [
         "",
-        "╭─ NIXHOST FIRST-RUN SETUP ─────────────────────────────────────────",
+        "╭─ NIX SHIP FIRST-RUN SETUP ────────────────────────────────────────",
         `│ ${label}`,
         `│ ${url}`,
         "╰────────────────────────────────────────────────────────────────────",

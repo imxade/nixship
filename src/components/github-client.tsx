@@ -153,7 +153,7 @@ export function GitHubClient() {
             <div className="max-w-xl">
               <h2 className="text-2xl font-bold">Connect GitHub</h2>
               <p className="mt-3 text-base-content/65">
-                NixHost creates a GitHub App preconfigured with repository read access and signed
+                Nix Ship creates a GitHub App preconfigured with repository read access and signed
                 push events. You choose which repositories it can access.
               </p>
               {status.canManage ? (

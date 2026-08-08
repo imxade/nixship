@@ -8,6 +8,7 @@ import {
 } from "@/server/app-service";
 import { requireRole } from "@/server/auth";
 import { events } from "@/server/events";
+import { latestHarburRevision } from "@/server/harbur";
 import { api, readJson } from "@/server/http";
 import { clientIp, requestUser } from "@/server/next-auth";
 import { getRuntime } from "@/server/runtime";
@@ -20,16 +21,18 @@ export async function GET(request: NextRequest) {
     requestUser(request);
     const runtime = await getRuntime();
     const cloudflare = runtime.cloudflare.status();
-    const quickTunnelByApp = new Map(
+    const quickTunnelByDeployment = new Map(
       runtime.quickTunnels
         .status()
-        .routes.filter((route) => route.appId)
-        .map((route) => [route.appId, route]),
+        .routes.filter((route) => route.deploymentId)
+        .map((route) => [route.deploymentId, route]),
     );
     return listApplications().map((app) => {
       const domains = applicationDomains(app.id);
       const routes = cloudflare.routes.filter((route) => route.appId === app.id);
-      const quickTunnel = quickTunnelByApp.get(app.id) ?? null;
+      const quickTunnel = app.active_deployment_id
+        ? (quickTunnelByDeployment.get(app.active_deployment_id) ?? null)
+        : null;
       const operationalStatus = runtime.applicationOperationalStatus(app.id);
       return {
         ...app,
@@ -60,7 +63,12 @@ export async function POST(request: NextRequest) {
     const runtimeInstance = await getRuntime();
     await runtimeInstance.proxy.reconcile();
     await runtimeInstance.quickTunnels.reconcile();
-    const deployment = queueDeployment(app.id, { trigger: "manual" });
+    const revision = app.source_provider === "harbur" ? await latestHarburRevision(app) : null;
+    const deployment = queueDeployment(app.id, {
+      trigger: "manual",
+      commitSha: revision,
+      requestedRef: revision ?? undefined,
+    });
     events.publish("deployment.queued", `app:${app.id}`, {
       deploymentId: deployment.id,
       trigger: "manual",

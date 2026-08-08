@@ -10,11 +10,11 @@
 
 ## ADR-002 — Nix flakes are the only deployment definition
 
-**Decision:** Require `flake.nix`, `flake.lock`, and a runnable flake app output. A project can isolate production packaging in `nixhost.nix`, imported by the flake, but NixHost never evaluates that loose file directly. Do not add dashboard-defined build/start shell commands.
+**Decision:** Require `flake.nix`, `flake.lock`, and a runnable flake app output. A project can isolate production packaging in `live.nix`, imported by the flake, but Nix Ship never evaluates that loose file directly. Do not add dashboard-defined build/start shell commands.
 
 **Reason:** This keeps the application package reproducible and prevents the control plane from becoming an unrestricted remote shell interface.
 
-## ADR-003 — GitHub-only repository import initially
+## ADR-003 — GitHub is the initial Git provider
 
 **Decision:** Accept dashboard-selected GitHub App repositories or canonical HTTPS `github.com/<owner>/<repo>` URLs only.
 
@@ -48,7 +48,7 @@ operator-owned domains on persistent named tunnels.
 **Reason:** Initial use must not require a public account or domain. OAuth avoids
 asking end users to construct long-lived API tokens, while named tunnels provide
 stable DNS, SSE and availability. The same localhost origins can later be
-exposed through outbound tunnels without inventing a default NixHost domain.
+exposed through outbound tunnels without inventing a default Nix Ship domain.
 
 ## ADR-008 — No security claim between applications
 
@@ -69,3 +69,11 @@ exposed through outbound tunnels without inventing a default NixHost domain.
 **Reason:** The intended Android experience is install, open, configure and host. The Next.js control plane, Nix flake application contract, authenticated LAN access and optional Cloudflare path remain consistent across distributions.
 
 **Consequence:** APK readiness requires an explicit Android packaging design, compliant delivery of the Nix/runtime dependencies, Maestro UI automation and physical multi-OEM lifecycle tests. The APK source, foreground-service adapter, signing configuration and binaries belong to a separate Android distribution repository. Documentation in this repository must not imply that the APK exists until those gates pass.
+
+## ADR-011 — Harbur uses immutable snapshots, not Drive or Git emulation
+
+**Decision:** Integrate Harbur through its versioned read-only repository, exact-snapshot and durable event-feed API. Store one encrypted instance token and a per-connection cursor. Do not read Google Drive directly or make Harbur emulate Git.
+
+**Reason:** Harbur owns repository authorization and Drive layout, while Nix Ship owns deployment verification and promotion. A narrow HTTP contract avoids duplicated Drive permission logic and lets a merge identify the exact content-addressed revision that is deployed.
+
+**Consequence:** Harbur snapshots are size/digest verified and safely extracted before ordinary flake evaluation. Private/LAN instance access requires explicit owner configuration; workloads remain trusted and are not isolated.

@@ -1,5 +1,5 @@
 {
-  description = "Minimal NixHost web application";
+  description = "Minimal Nix Ship web application";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   outputs = { self, nixpkgs }:
     let
@@ -9,10 +9,10 @@
       packages = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; };
         in {
-          default = import ./nixhost.nix { inherit pkgs; };
+          default = import ./live.nix { inherit pkgs; };
         });
       apps = forAllSystems (system: {
-        default = { type = "app"; program = "${self.packages.${system}.default}/bin/hello-nixhost"; };
+        default = { type = "app"; program = "${self.packages.${system}.default}/bin/hello-flake"; };
       });
     };
 }

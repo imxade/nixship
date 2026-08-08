@@ -5,13 +5,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-examples-"));
-process.env.NIXHOST_DATA_DIR = path.join(root, "data");
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 17).toString("base64");
-process.env.NIXHOST_MIN_FREE_DISK_MB = "128";
-process.env.NIXHOST_MIN_FREE_MEMORY_MB = "64";
-process.env.NIXHOST_GIT_POLL_SECONDS = "86400";
-process.env.NIXHOST_METRICS_SECONDS = "2";
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "platform-examples-"));
+process.env.PLATFORM_DATA_DIR = path.join(root, "data");
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 17).toString("base64");
+process.env.MIN_FREE_DISK_MB = "128";
+process.env.MIN_FREE_MEMORY_MB = "64";
+process.env.SOURCE_POLL_SECONDS = "86400";
+process.env.METRICS_INTERVAL_SECONDS = "2";
 
 const [{ PlatformRuntime }, database, appService, ports] = await Promise.all([
   import("../../src/server/runtime.ts"),
@@ -22,14 +22,14 @@ const [{ PlatformRuntime }, database, appService, ports] = await Promise.all([
 
 const examples = [
   {
-    name: "hello-nixhost",
+    name: "hello-flake",
     healthPath: "/",
-    expectedBody: "Hello from NixHost",
+    expectedBody: "Hello from Nix Ship",
   },
   {
-    name: "npm-start-nixhost",
+    name: "npm-start-flake",
     healthPath: "/health",
-    expectedBody: '"app":"npm-start-nixhost"',
+    expectedBody: '"app":"npm-start-flake"',
   },
 ] as const;
 
@@ -114,8 +114,8 @@ function createExampleRepository(name: string): string {
     fs.copyFileSync(path.join(process.cwd(), trackedFile), destination);
   }
   execFileSync("git", ["init", "--initial-branch=fixture-head", target], { stdio: "ignore" });
-  git(target, ["config", "user.email", "examples@nixhost.invalid"]);
-  git(target, ["config", "user.name", "NixHost examples"]);
+  git(target, ["config", "user.email", "examples@platform.invalid"]);
+  git(target, ["config", "user.name", "Nix Ship examples"]);
   git(target, ["add", "."]);
   git(target, ["commit", "-m", `test ${name}`]);
   return target;

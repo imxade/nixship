@@ -1,9 +1,12 @@
 {
-  "name": "nixhost",
+  "name": "nixship",
   "version": "0.1.0",
   "private": true,
   "author": "Rituraj Basak",
   "license": "Apache-2.0",
+  "repository": "https://github.com/imxade/nixship",
+  "homepage": "https://github.com/imxade/nixship#readme",
+  "bugs": "https://github.com/imxade/nixship/issues",
   "description": "LAN-first Next.js control plane for deploying trusted Nix flake applications on Nix-capable devices.",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
@@ -12,13 +15,14 @@
   },
   "pnpm": {
     "overrides": {
+      "nanoid": "3.3.17",
       "postcss": "8.5.18",
       "sharp": "0.35.0"
     }
   },
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "NIXHOST_DISABLE_RUNTIME=1 next build && tsc -p tsconfig.server.json",
+    "build": "DISABLE_PLATFORM_RUNTIME=1 next build && tsc -p tsconfig.server.json",
     "start": "NODE_ENV=production node dist-server/server.js",
     "start:ci": "tsx scripts/start-ci.ts",
     "format": "biome format --write .",
@@ -41,6 +45,7 @@
   },
   "dependencies": {
     "better-sqlite3": "13.0.1",
+    "jszip": "3.10.1",
     "next": "16.2.11",
     "react": "19.2.8",
     "react-dom": "19.2.8",

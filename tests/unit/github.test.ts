@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nixhost-github-test-"));
-process.env.NIXHOST_DATA_DIR = dataDirectory;
-process.env.NIXHOST_MASTER_KEY = Buffer.alloc(32, 31).toString("base64");
+const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-github-test-"));
+process.env.PLATFORM_DATA_DIR = dataDirectory;
+process.env.PLATFORM_MASTER_KEY = Buffer.alloc(32, 31).toString("base64");
 
 const [{ createManifest, gitAuthenticationEnvironment, listRepositories }, database, secrets] =
   await Promise.all([
@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  delete process.env.NIXHOST_PUBLIC_URL;
+  delete process.env.PLATFORM_PUBLIC_URL;
   database.closeDb();
   fs.rmSync(dataDirectory, { recursive: true, force: true });
 });
@@ -29,7 +29,7 @@ afterAll(() => {
 describe("GitHub App manifest", () => {
   it("provides the required public hook URL but keeps it inactive for a LAN-only node", async () => {
     const { config } = await import("../../src/server/config.ts");
-    config.NIXHOST_PUBLIC_URL = "";
+    config.PLATFORM_PUBLIC_URL = "";
     const { manifest } = createManifest("http://127.0.0.1:3000");
 
     expect(manifest.hook_attributes).toEqual({
@@ -42,7 +42,7 @@ describe("GitHub App manifest", () => {
 
   it("activates the webhook only for the configured public origin", async () => {
     const { config } = await import("../../src/server/config.ts");
-    config.NIXHOST_PUBLIC_URL = "https://console.example.com/";
+    config.PLATFORM_PUBLIC_URL = "https://console.example.com/";
     const { manifest } = createManifest("http://127.0.0.1:3000");
 
     expect(manifest.hook_attributes).toEqual({
@@ -69,12 +69,12 @@ describe("GitHub repository discovery", () => {
       )
       .run(
         123,
-        "nixhost-test",
+        "platform-test",
         "client",
         secrets.encryptSecret("client-secret"),
         secrets.encryptSecret(privateKey),
         secrets.encryptSecret("webhook-secret"),
-        "https://github.com/apps/nixhost-test",
+        "https://github.com/apps/platform-test",
         now,
         now,
       );

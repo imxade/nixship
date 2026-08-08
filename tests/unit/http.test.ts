@@ -23,7 +23,7 @@ describe("URL-encoded form parsing", () => {
 });
 
 function formRequest(body: string): NextRequest {
-  return new NextRequest("http://nixhost.test/api/setup/complete", {
+  return new NextRequest("http://platform.test/api/setup/complete", {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",

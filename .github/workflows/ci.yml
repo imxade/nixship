@@ -29,13 +29,13 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
         env:
-          NIXHOST_E2E_DATA_DIR: ${{ runner.temp }}/nixhost-e2e
+          E2E_DATA_DIR: ${{ runner.temp }}/platform-e2e
       - run: pnpm db:doctor
         env:
-          NIXHOST_DATA_DIR: ${{ runner.temp }}/nixhost-doctor
+          PLATFORM_DATA_DIR: ${{ runner.temp }}/platform-doctor
       - run: pnpm security:check
         env:
-          NIXHOST_DATA_DIR: ${{ runner.temp }}/nixhost-doctor
+          PLATFORM_DATA_DIR: ${{ runner.temp }}/platform-doctor
       - run: pnpm audit --prod --audit-level high
       - run: pnpm licenses list --prod
 

@@ -2,19 +2,19 @@
 
 ## Product
 
-**NixHost** is a self-hosted personal PaaS for trusted Nix flake applications. A user installs or already has working Nix, opens the LAN dashboard, connects GitHub, selects a repository, and deploys. The platform rebuilds and redeploys the configured production branch automatically.
+**Nix Ship** is a self-hosted personal PaaS for trusted Nix flake applications. A user installs or already has working Nix, opens the LAN dashboard, connects GitHub, selects a repository, and deploys. The platform rebuilds and redeploys the configured production branch automatically.
 
 ## Positioning
 
-NixHost is comparable in workflow to a small Vercel, Coolify or Dokploy node, but it runs directly under the user's Nix account. It is not a VPS, VM, container runtime, NixOS installation, or security boundary.
+Nix Ship is comparable in workflow to a small Vercel, Coolify or Dokploy node, but it runs directly under the user's Nix account. It is not a VPS, VM, container runtime, NixOS installation, or security boundary.
 
 ## Initial user journey
 
-1. Start NixHost on the host device.
+1. Start Nix Ship on the host device.
 2. Visit its LAN address.
 3. Claim it with the one-time terminal token.
 4. Create the owner account.
-5. Connect GitHub or enter a public HTTPS GitHub repository URL.
+5. Connect GitHub, enter a public HTTPS GitHub repository URL, or connect Harbur once.
 6. Select repository and flake app output; optionally override the repository's default branch.
 7. Configure health path and environment variables.
 8. Deploy.
@@ -34,7 +34,7 @@ NixHost is comparable in workflow to a small Vercel, Coolify or Dokploy node, bu
 
 ### Applications
 
-- Import HTTPS GitHub repositories.
+- Import HTTPS GitHub repositories or immutable Harbur repository snapshots.
 - Require `flake.nix` and `flake.lock`.
 - Discover and validate the selected flake app output for the current Nix system.
 - Support web and worker applications.
@@ -81,14 +81,15 @@ NixHost is comparable in workflow to a small Vercel, Coolify or Dokploy node, bu
 - No shell interpolation for Git/Nix execution.
 - Bounded request sizes and log buffering.
 - Deployment queue source of truth in SQLite.
-- One active deployment per application and configurable host build concurrency.
+- A persisted global limit of 1–20 active deployments per application and configurable
+  host build concurrency.
 - Mobile-responsive and keyboard-accessible dashboard.
 - No claim of exact OOM attribution without evidence.
 - Application processes must not depend on the dashboard process remaining alive.
 
 ## Success criteria for Android feasibility
 
-- NixHost builds and starts on two ARM64 Android devices through Nix-on-Droid.
+- Nix Ship builds and starts on two ARM64 Android devices through Nix-on-Droid.
 - `better-sqlite3` builds and passes integrity tests.
 - A sample web flake deploys and is reachable on the LAN.
 - Screen-off operation works while the Nix-on-Droid wake lock is held.

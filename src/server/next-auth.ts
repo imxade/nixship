@@ -4,8 +4,8 @@ import type { NextRequest } from "next/server";
 import { type AuthenticatedUser, authenticateSession } from "./auth.ts";
 import { HttpError } from "./errors.ts";
 
-export const SESSION_COOKIE = "nixhost_session";
-export const SETUP_COOKIE = "nixhost_setup";
+export const SESSION_COOKIE = "platform_session";
+export const SETUP_COOKIE = "platform_setup";
 
 export async function currentUser(): Promise<AuthenticatedUser | null> {
   const store = await cookies();
@@ -26,7 +26,7 @@ export function requestUser(request: NextRequest): AuthenticatedUser {
 
 export function clientIp(request: NextRequest): string | null {
   return (
-    request.headers.get("cf-connecting-ip") ?? request.headers.get("x-nixhost-client-ip") ?? null
+    request.headers.get("cf-connecting-ip") ?? request.headers.get("x-platform-client-ip") ?? null
   );
 }
 

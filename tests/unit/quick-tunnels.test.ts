@@ -53,7 +53,7 @@ describe("Quick Tunnel URL discovery", () => {
         Object.assign(new Error("spawn cloudflared ENOENT"), { code: "ENOENT" }),
       ),
     ).toBe(
-      "Missing dependency: cloudflared. Install cloudflared or set NIXHOST_CLOUDFLARED_BIN to its absolute path.",
+      "Missing dependency: cloudflared. Install cloudflared or set CLOUDFLARED_BIN to its absolute path.",
     );
   });
 
@@ -121,24 +121,21 @@ describe("Quick Tunnel URL discovery", () => {
     ).resolves.toBe(false);
   });
 
-  it("requires the application response to pass through its stable proxy", async () => {
-    const proxyResponse = new Response("", {
-      status: 503,
-      headers: { "x-nixhost-application-proxy": "ready" },
-    });
+  it("requires a deployment route to return an application response instead of an edge error", async () => {
+    const applicationResponse = new Response("", { status: 404 });
 
     await expect(
       quickTunnelRouteIsReachable(
-        "https://application-route.trycloudflare.com",
-        "application",
-        vi.fn<typeof fetch>(async () => proxyResponse),
+        "https://deployment-route.trycloudflare.com",
+        "deployment",
+        vi.fn<typeof fetch>(async () => applicationResponse),
         async () => true,
       ),
     ).resolves.toBe(true);
     await expect(
       quickTunnelRouteIsReachable(
-        "https://application-route.trycloudflare.com",
-        "application",
+        "https://deployment-route.trycloudflare.com",
+        "deployment",
         vi.fn<typeof fetch>(async () => new Response("Cloudflare", { status: 522 })),
         async () => true,
       ),
