@@ -1,30 +1,23 @@
 # Nix Ship
 
 Self-hosted deployment platform for [Nix flake](https://nix.dev/concepts/flakes)
-applications. Connect a GitHub or Harbur repository, pick a flake output, and deploy —
+applications. Connect a GitHub or Harbur repository, pick a flake output, and deploy.
 Nix Ship supervises the process, streams logs, assigns a stable LAN port, and
 optionally exposes it through Cloudflare Tunnel.
 
 ## Features
 
-- **GitHub auto-deploy** — push to your production branch, Nix Ship redeploys
-  the exact commit. Branch reconciliation catches missed webhooks.
-- **Harbur merge deploys** — poll durable merge events and deploy the exact
-  digest-verified immutable snapshot.
-- **LAN-first** — every application gets a stable port reachable at
-  `http://<device-ip>:<port>` with no external dependency.
-- **Quick Tunnels** — account-free temporary `trycloudflare.com` URLs for the
-  dashboard and every active web deployment, shown only after the public edge
-  reaches that deployment when `cloudflared` is available.
-- **Release retention and promotion** — retain a global number of active releases
-  per project, preview each independently, and point a configured production
-  domain at any healthy retained release without rebuilding it.
-- **Persistent named tunnels** — optional restricted Cloudflare API-token
-  connection for custom domains, DNS management and multi-zone support.
-- **Encrypted secrets** — environment variables are encrypted at rest and never
-  returned by APIs. Paste directly from a `.env` file.
-- **Zero-downtime deploys** — the current healthy release stays routed until the
-  candidate passes health checks.
+| Feature | Description |
+| :--- | :--- |
+| **GitHub auto-deploy** | Push to your production branch, Nix Ship redeploys the exact commit. Branch reconciliation catches missed webhooks. |
+| **Harbur merge deploys** | Poll durable merge events and deploy the exact digest-verified immutable snapshot. |
+| **LAN-first** | Every application gets a stable port reachable at `http://<device-ip>:<port>` with no external dependency. |
+| **Quick Tunnels** | Account-free temporary `trycloudflare.com` URLs for the dashboard and every active web deployment, shown only after the public edge reaches that deployment when `cloudflared` is available. |
+| **Release retention & promotion** | Retain a global number of active releases per project, preview each independently, and point a configured production domain at any healthy retained release without rebuilding it. |
+| **Persistent named tunnels** | Optional restricted Cloudflare API-token connection for custom domains, DNS management and multi-zone support. |
+| **Encrypted secrets** | Environment variables are encrypted at rest and never returned by APIs. Paste directly from a `.env` file. |
+| **Zero-downtime deploys** | The current healthy release stays routed until the candidate passes health checks. |
+
 
 ## Quick start
 
@@ -46,12 +39,12 @@ immediately.
 
 ## Deploy an application
 
-1. **Connect a source** — use the GitHub App manifest flow, paste a public
+1. **Connect a source**: use the GitHub App manifest flow, paste a public
    GitHub URL, or verify a Harbur instance once with its read token.
 2. **Search and select** a trusted repository with a locked flake.
 3. **Pick the flake output** (defaults to `apps.<system>.default`).
 4. **Configure** health path and environment variables.
-5. **Deploy** — Nix Ship clones, evaluates the flake, builds via `nix run`, and
+5. **Deploy**: Nix Ship clones, evaluates the flake, builds via `nix run`, and
    health-checks the candidate before switching traffic.
 
 ## Application contract
