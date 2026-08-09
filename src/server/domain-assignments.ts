@@ -138,14 +138,18 @@ export function updateDomainAssignment(
 export function domainOwnershipComment(hostname?: string): string {
   const assignment = hostname ? domainAssignment(hostname) : null;
   const marker = assignment?.ownership_marker;
-  return `Managed by Nix Ship; instance=${domainInstanceId()}${marker ? `; assignment=${marker}` : ""}`;
+  return `nixship:${domainInstanceId()}${marker ? `:${marker}` : ""}`;
 }
 
 export function ownsDomainComment(comment: string | null | undefined, hostname?: string): boolean {
   if (comment === domainOwnershipComment(hostname)) return true;
-  const instancePrefix = `Managed by Nix Ship; instance=${domainInstanceId()}`;
-  if (comment === instancePrefix) return true;
-  if (comment?.startsWith(`${instancePrefix}; assignment=`)) return true;
+  const instanceId = domainInstanceId();
+  const compactPrefix = `nixship:${instanceId}`;
+  if (comment === compactPrefix) return true;
+  if (comment?.startsWith(`${compactPrefix}:`)) return true;
+  const legacyPrefix = `Managed by Nix Ship; instance=${instanceId}`;
+  if (comment === legacyPrefix) return true;
+  if (comment?.startsWith(`${legacyPrefix}; assignment=`)) return true;
   return comment === "Managed by Nix Ship";
 }
 

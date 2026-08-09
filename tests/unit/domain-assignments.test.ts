@@ -127,4 +127,24 @@ describe("domain assignments", () => {
 
     expect(assignments.ownsDomainComment(comment, "old.example.com")).toBe(true);
   });
+
+  it("keeps Cloudflare ownership comments below the provider limit", () => {
+    appService.replaceApplicationDomains("app-1", ["long-marker.example.com"]);
+
+    const comment = assignments.domainOwnershipComment("long-marker.example.com");
+
+    expect(comment.length).toBeLessThanOrEqual(100);
+    expect(comment).toMatch(/^nixship:[0-9a-f-]{36}:[0-9a-f]{32}$/);
+  });
+
+  it("still recognizes legacy verbose ownership comments for cleanup", () => {
+    appService.replaceApplicationDomains("app-1", ["legacy.example.com"]);
+    const compact = assignments.domainOwnershipComment("legacy.example.com");
+    const [, instanceId, marker] = compact.split(":");
+    const legacyComment = `Managed by Nix Ship; instance=${instanceId}; assignment=${marker}`;
+
+    appService.replaceApplicationDomains("app-1", []);
+
+    expect(assignments.ownsDomainComment(legacyComment, "legacy.example.com")).toBe(true);
+  });
 });
