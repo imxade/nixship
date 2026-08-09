@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: PRODUCT_NAME, template: `%s · ${PRODUCT_NAME}` },
-  description: "LAN-first control plane for trusted Nix flake deployments.",
+  description: "control plane for trusted Nix flake deployments.",
   icons: {
     icon: [{ url: BRAND_MARK_PATH, type: "image/png" }],
     shortcut: BRAND_MARK_PATH,

@@ -55,7 +55,7 @@ export function DashboardShell({
             <BrandMark className="size-10 shrink-0 drop-shadow-sm" />
             <div>
               <div className="text-xl font-bold">{PRODUCT_NAME}</div>
-              <div className="text-xs text-base-content/60">LAN deployment control plane</div>
+              <div className="text-xs text-base-content/60">Deployment control plane</div>
             </div>
           </Link>
           <ul className="menu mt-4 gap-1 p-0">
@@ -67,8 +67,8 @@ export function DashboardShell({
                     href={href}
                     className={
                       pathname === href ||
-                      (href !== "/apps" && pathname.startsWith(href)) ||
-                      (href === "/apps" && pathname.startsWith("/apps"))
+                        (href !== "/apps" && pathname.startsWith(href)) ||
+                        (href === "/apps" && pathname.startsWith("/apps"))
                         ? "active"
                         : ""
                     }

@@ -1,5 +1,5 @@
 {
-  description = "Nix Ship — LAN-first Next.js control plane for Nix flake applications";
+  description = "Nix Ship — Next.js control plane for Nix flake applications";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

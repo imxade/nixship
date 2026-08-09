@@ -21,7 +21,7 @@ Verified implementation and tests are the source of truth. Documentation explain
 - Keep Nix flakes as the only normal application build/run contract.
 - Never execute user-supplied dashboard text through a shell.
 - Preserve the current healthy release until a candidate is proven healthy.
-- Preserve LAN-first operation and optional Cloudflare exposure.
+- Preserve operation and optional Cloudflare exposure.
 - Treat all workload repositories as trusted; never imply isolation that does not exist.
 - Never fabricate successful builds, tests, compatibility, benchmark results, lock files, hashes, citations, or external integration results.
 
