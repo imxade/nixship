@@ -55,10 +55,8 @@ exactly one visible theme control at each size. Applications, GitHub, Cloudflare
 and System also receive injected initial API failures; each must stop its loading
 indicator, display the failure and provide a retry action.
 
-Cloudflare tests cover PKCE construction, hashed single-use state, callback
-replay rejection, encrypted pending grants, paginated account/zone discovery,
-refresh-token rotation, manual token validation, managed/external DNS states,
-ownership-checked DNS cleanup and the responsive OAuth/zone-selection UI. A
+Cloudflare tests cover API-token validation, zone discovery, pending and managed
+DNS states, ownership-checked DNS cleanup and the responsive connection UI. A
 mocked API result is not a live Cloudflare acceptance result.
 
 Quick Tunnel unit coverage validates strict `trycloudflare.com` URL discovery,

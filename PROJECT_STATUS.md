@@ -36,11 +36,13 @@ Last updated: 2026-08-09.
 - Detached application process groups, Linux start-time/cmdline/command-hash identity checks, conservative non-Linux recovery and guarded group signalling.
 - Candidate health checks, atomic route activation, current healthy release preservation and control-plane restart recovery.
 - Stable per-application LAN ports plus multiple normalized custom domains, host-based HTTP routing and provider-neutral DNS/TLS support.
-- Optional multi-zone Cloudflare DNS/Tunnel synchronization, public-client
-  OAuth with PKCE/single-use state/encrypted refresh tokens, account/zone
-  discovery, manual-token fallback, pre-save account/zone/tunnel-access
-  verification, per-project route status and ownership-checked cleanup of
-  removed managed records.
+- Optional multi-zone Cloudflare DNS/Tunnel synchronization using one encrypted
+  least-privilege API token, zone discovery, pre-save token/account/tunnel-access
+  verification, per-project route status, a global case-insensitive hostname
+  assignment registry, serialized ingress writes, foreign-record conflict
+  protection and instance-marked cleanup of removed managed records. Apex and
+  subdomain assignments are independent, while one exact hostname can belong
+  to only one application or the dashboard.
 - Automatic account-free Quick Tunnels for the dashboard and every web application's
   stable public port, with supervised lifecycle, strict URL parsing, simultaneous
   LAN/temporary/custom access links, public-DNS and end-to-end edge readiness
@@ -216,11 +218,11 @@ overflow across authenticated routes at phone, tablet, and desktop sizes,
 session cookies, hostile-origin rejection, user creation, viewer login, viewer
 write denial, the separate CI admin and hourly throttle timing.
 
-The Cloudflare unit integration verifies PKCE/scopes, one-time callback state,
-refresh-token rotation, candidate rollback, managed and external per-project
-states, remote ingress construction, removal of stale Nix Ship-owned DNS, and
-preservation of records whose target or ownership comment does not match. It
-uses a deterministic mocked Cloudflare API; it is not a live-account result.
+The Cloudflare unit integration verifies restricted API-token validation, zone
+discovery/onboarding, candidate rollback, managed and pending per-project states,
+remote ingress construction, removal of stale Nix Ship-owned DNS, and preservation
+of records whose target or ownership comment does not match. It uses a
+deterministic mocked Cloudflare API; it is not a live-account result.
 
 Git reconciliation now records every observed commit, including failed
 deployments, so branch polling cannot continuously retry the same broken
@@ -263,12 +265,10 @@ and `aarch64-darwin`. Its Maestro 2.6.1 CI login flow passed on an Android 15
 x86_64 development emulator and recorded non-release evidence. The
 Nix-on-Droid runner correctly rejected that non-ARM64 device.
 
-Cloudflare OAuth is now an optional provider module controlled by
-`CLOUDFLARE_OAUTH_ENABLED`, which defaults to false. Disabling that one
-switch prevents provider loading and consent/refresh operations while leaving
-Quick Tunnels, LAN routing and manual API-token configuration independent. Unit
-coverage verifies the disabled boundary even when OAuth credentials are present.
-Live OAuth and custom-domain acceptance remain external release gates.
+Cloudflare persistent-domain authorization is now API-token-only. The token is
+validated before encrypted storage and is independent from account-free Quick
+Tunnels and LAN routing. Live zone onboarding and custom-domain acceptance
+remain external release gates.
 
 The security review reconfirmed argument-array process spawning, strict GitHub URL
 and branch validation, encrypted secrets, HMAC-verified/deduplicated webhooks,
@@ -283,10 +283,10 @@ removed. The production dependency audit reports no known vulnerabilities.
   and signed public webhook delivery are pending the owner’s test-account
   action. Public-repository branch reconciliation and push redeployment have
   passed.
-- Cloudflare live OAuth consent, zone/tunnel, Access policy, reconnect,
-  refresh-token and custom-domain lifecycle tests have not been run against an
-  account. Unit and browser coverage use deterministic mocked Cloudflare
-  responses and cannot replace that evidence.
+- Cloudflare live API-token, zone/tunnel, Access policy, reconnect and
+  custom-domain lifecycle tests have not been run against an account. Unit and
+  browser coverage use deterministic mocked Cloudflare responses and cannot
+  replace that evidence.
 - No native `aarch64-linux`, Darwin or physical Android build was executed. Cross-platform packages in the dependency store are not evidence that those targets work.
 - Android development automation passed its browser flow on an Android 15
   x86_64 emulator using the locked Maestro shell, while the Nix-on-Droid

@@ -24,6 +24,10 @@ describe("database migrations", () => {
     apply(db, migration("007_quick_tunnels.sql"));
     apply(db, migration("008_active_deployments.sql"));
     apply(db, migration("009_source_integrations.sql"));
+    apply(db, migration("010_domain_assignments.sql"));
+    apply(db, migration("011_cloudflare_api_token_only.sql"));
+    apply(db, migration("012_domain_zones.sql"));
+    apply(db, migration("013_drop_cloudflare_domain_status.sql"));
 
     expect(
       db
@@ -41,17 +45,31 @@ describe("database migrations", () => {
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cloudflare_domain_status'",
         )
         .get(),
-    ).toEqual({ name: "cloudflare_domain_status" });
+    ).toBeUndefined();
     expect(
       db
         .prepare(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cloudflare_oauth_sessions'",
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'cloudflare_oauth_%'",
         )
-        .get(),
-    ).toEqual({ name: "cloudflare_oauth_sessions" });
-    expect(db.prepare("SELECT auth_method FROM cloudflare_config").columns()[0]?.name).toBe(
-      "auth_method",
-    );
+        .all(),
+    ).toEqual([]);
+    expect(
+      db
+        .prepare("SELECT * FROM cloudflare_config")
+        .columns()
+        .map((column) => column.name),
+    ).toEqual([
+      "singleton",
+      "account_id",
+      "api_token_encrypted",
+      "tunnel_id",
+      "tunnel_name",
+      "tunnel_token_encrypted",
+      "dashboard_hostname",
+      "enabled",
+      "created_at",
+      "updated_at",
+    ]);
     expect(
       db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'quick_tunnels'")
@@ -73,6 +91,24 @@ describe("database migrations", () => {
     expect(db.prepare("SELECT source_provider FROM applications").columns()[0]?.name).toBe(
       "source_provider",
     );
+    expect(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'domain_assignments'",
+        )
+        .get(),
+    ).toEqual({ name: "domain_assignments" });
+    expect(
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'domain_zones'")
+        .get(),
+    ).toEqual({ name: "domain_zones" });
+    expect(
+      db
+        .prepare("SELECT * FROM domain_zones")
+        .columns()
+        .map((column) => column.name),
+    ).toContain("observed_records");
     expect(db.pragma("foreign_key_check")).toEqual([]);
     db.close();
   });
@@ -101,9 +137,24 @@ describe("database migrations", () => {
     apply(db, migration("007_quick_tunnels.sql"));
     apply(db, migration("008_active_deployments.sql"));
     apply(db, migration("009_source_integrations.sql"));
+    apply(db, migration("010_domain_assignments.sql"));
+    apply(db, migration("011_cloudflare_api_token_only.sql"));
+    apply(db, migration("012_domain_zones.sql"));
+    apply(db, migration("013_drop_cloudflare_domain_status.sql"));
 
     expect(db.prepare("SELECT hostname, app_id FROM application_domains").all()).toEqual([
       { hostname: "app.example.com", app_id: "app-1" },
+    ]);
+    expect(
+      db.prepare("SELECT hostname, apex, target_type, app_id, state FROM domain_assignments").all(),
+    ).toEqual([
+      {
+        hostname: "app.example.com",
+        apex: "app.example.com",
+        target_type: "application",
+        app_id: "app-1",
+        state: "waiting-zone",
+      },
     ]);
     expect(db.prepare("SELECT 1 FROM settings WHERE key LIKE 'domain:%'").get()).toBeUndefined();
     db.close();

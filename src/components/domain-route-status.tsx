@@ -3,7 +3,7 @@ export type DomainRoute = {
   appName: string;
   hostname: string;
   publicPort: number;
-  status: "not-configured" | "pending" | "managed" | "external" | "error";
+  status: "not-configured" | "pending" | "managed" | "error";
   zoneId: string | null;
   lastError: string | null;
   lastSyncedAt: string | null;
@@ -13,7 +13,6 @@ const presentation = {
   "not-configured": { label: "Cloudflare not connected", className: "badge-ghost" },
   pending: { label: "Awaiting sync", className: "badge-warning" },
   managed: { label: "Cloudflare managed", className: "badge-success" },
-  external: { label: "External DNS/TLS", className: "badge-info" },
   error: { label: "Sync failed", className: "badge-error" },
 } satisfies Record<DomainRoute["status"], { label: string; className: string }>;
 

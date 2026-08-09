@@ -4,6 +4,7 @@ import { z } from "zod";
 import { audit } from "./audit.ts";
 import { encryptSecret } from "./crypto.ts";
 import { getDb, nowIso } from "./db.ts";
+import { replaceApplicationDomainAssignments } from "./domain-assignments.ts";
 import { HttpError } from "./errors.ts";
 import { isValidGitBranchName, remoteDefaultBranch } from "./git.ts";
 import { getHarburConnection, listHarburRepositories } from "./harbur.ts";
@@ -229,26 +230,7 @@ export function replaceApplicationDomains(appId: string, values: string[]): stri
     );
   }
   const domains = [...new Set(values.map(normalizeDomain))];
-  const now = nowIso();
-  const db = getDb();
-  try {
-    db.transaction(() => {
-      db.prepare("DELETE FROM application_domains WHERE app_id = ?").run(appId);
-      const insert = db.prepare(
-        "INSERT INTO application_domains(hostname, app_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-      );
-      for (const hostname of domains) insert.run(hostname, appId, now, now);
-    })();
-  } catch (error) {
-    if (error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
-      throw new HttpError(
-        409,
-        "A custom domain can only be assigned to one application",
-        "domain_already_assigned",
-      );
-    }
-    throw error;
-  }
+  replaceApplicationDomainAssignments(appId, domains);
   return applicationDomains(appId);
 }
 

@@ -10,27 +10,36 @@ type Status = {
   configured: boolean;
   enabled: boolean;
   running: boolean;
-  connectionMethod: "api_token" | "oauth" | null;
   accountId: string | null;
-  zoneId: string | null;
   tunnelId: string | null;
   dashboardHostname: string | null;
-  oauth: { available: boolean; pending: boolean };
+  zones: DomainZone[];
   routes: DomainRoute[];
 };
 
-type OAuthResources = {
-  accounts: Array<{ id: string; name: string }>;
-  zones: Array<{ id: string; name: string; accountId: string; accountName: string }>;
+type DomainZone = {
+  apex: string;
+  zoneId: string;
+  state: "discovered" | "pending-delegation" | "active" | "error";
+  assignedNameservers: string[];
+  observedNameservers: string[];
+  originalNameservers: string[];
+  observedRecords: Array<{
+    type: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "CAA" | "DS";
+    value: string;
+  }>;
+  originalRegistrar: string | null;
+  inventoryConfirmed: boolean;
+  activatedAt: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
 };
 
 export function CloudflareClient() {
   const [status, setStatus] = useState<Status | null>(null);
   const [dashboardLinks, setDashboardLinks] = useState<AccessLink[]>([]);
-  const [resources, setResources] = useState<OAuthResources | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const [manualOpen, setManualOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -48,26 +57,8 @@ export function CloudflareClient() {
     }
   }, []);
 
-  const loadOAuthResources = useCallback(async () => {
-    setBusy("oauth-options");
-    try {
-      setResources(await apiFetch<OAuthResources>("/api/cloudflare/oauth/options"));
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Cloudflare account discovery failed");
-    } finally {
-      setBusy("");
-    }
-  }, []);
-
   useEffect(() => {
     void load();
-    const query = new URLSearchParams(window.location.search);
-    const callbackError = query.get("error");
-    if (callbackError) setError(callbackError);
-    if (query.has("error") || query.has("authorization")) {
-      window.history.replaceState(null, "", window.location.pathname);
-    }
     const source = new EventSource("/api/events?scope=system");
     source.addEventListener("quick_tunnel.ready", () => void load());
     source.addEventListener("quick_tunnel.stopped", () => void load());
@@ -78,55 +69,9 @@ export function CloudflareClient() {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (status?.oauth.pending && !resources && busy !== "oauth-options") {
-      void loadOAuthResources();
-    }
-  }, [busy, loadOAuthResources, resources, status?.oauth.pending]);
-
-  async function connectOAuth() {
-    setBusy("oauth");
-    try {
-      const result = await apiFetch<{ authorizationUrl: string }>("/api/cloudflare/oauth/start", {
-        method: "POST",
-      });
-      window.location.assign(result.authorizationUrl);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Cloudflare authorization failed");
-      setBusy("");
-    }
-  }
-
-  async function completeOAuth(event: FormEvent<HTMLFormElement>) {
+  async function configureToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy("oauth-complete");
-    const form = new FormData(event.currentTarget);
-    const [accountId, zoneId] = String(form.get("zone") ?? "").split(":");
-    try {
-      setStatus(
-        await apiFetch<Status>("/api/cloudflare/oauth/complete", {
-          method: "POST",
-          body: JSON.stringify({
-            accountId,
-            zoneId,
-            tunnelName: form.get("tunnelName"),
-            dashboardHostname: form.get("dashboardHostname"),
-          }),
-        }),
-      );
-      setResources(null);
-      await load();
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Cloudflare connection failed");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function configureManually(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy("manual");
+    setBusy("token");
     const form = new FormData(event.currentTarget);
     try {
       setStatus(
@@ -134,7 +79,6 @@ export function CloudflareClient() {
           method: "POST",
           body: JSON.stringify({
             accountId: form.get("accountId"),
-            zoneId: form.get("zoneId"),
             apiToken: form.get("apiToken"),
             tunnelName: form.get("tunnelName"),
             dashboardHostname: form.get("dashboardHostname"),
@@ -203,6 +147,23 @@ export function CloudflareClient() {
     }
   }
 
+  async function confirmZone(apex: string) {
+    setBusy(`zone:${apex}`);
+    try {
+      setStatus(
+        await apiFetch<Status>(`/api/cloudflare/zones/${encodeURIComponent(apex)}/confirm`, {
+          method: "POST",
+        }),
+      );
+      await load();
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Zone delegation check failed");
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <>
       <PageHeading
@@ -261,150 +222,137 @@ export function CloudflareClient() {
         <ConfiguredConnection
           status={status}
           busy={busy}
-          onReconnect={() => void connectOAuth()}
+          onConfigure={configureToken}
           onSaveDashboard={saveDashboardHostname}
         />
       ) : (
         <div className="max-w-3xl">
           <section className="card border border-base-300 bg-base-100">
             <div className="card-body">
-              <h2 className="card-title">Connect your Cloudflare account</h2>
+              <h2 className="card-title">Connect Cloudflare with an API token</h2>
               <p className="text-sm text-base-content/65">
-                Authorize Nix Ship, choose an existing Cloudflare DNS zone, and the persistent
-                tunnel starts automatically.
+                Create a restricted token once. Nix Ship encrypts it and uses it to discover zones,
+                manage DNS records, and supervise the persistent tunnel.
               </p>
-              {status.oauth.pending ? (
-                <OAuthCompletionForm
-                  resources={resources}
-                  busy={busy}
-                  onSubmit={completeOAuth}
-                  onRetry={() => void loadOAuthResources()}
-                />
-              ) : status.oauth.available ? (
-                <button
-                  type="button"
-                  className="btn btn-primary mt-2 w-full sm:w-auto"
-                  disabled={!!busy}
-                  onClick={() => void connectOAuth()}
-                >
-                  {busy === "oauth" && <span className="loading loading-spinner" />}
-                  Connect Cloudflare
-                </button>
-              ) : (
-                <div className="alert alert-warning mt-2">
-                  <span>
-                    Cloudflare OAuth is disabled or not fully configured in this distribution.
-                    Manual token connection and automatic Quick Tunnels remain available.
-                  </span>
-                </div>
-              )}
-              <details
-                className="collapse collapse-arrow mt-3 border border-base-300"
-                onToggle={(event) => setManualOpen(event.currentTarget.open)}
-              >
-                <summary className="collapse-title font-medium">Manual API token fallback</summary>
-                {manualOpen && (
-                  <div className="collapse-content">
-                    <ManualConnectionForm busy={busy} onSubmit={configureManually} />
-                  </div>
-                )}
-              </details>
+              <TokenConnectionForm busy={busy} onSubmit={configureToken} />
             </div>
           </section>
         </div>
       )}
 
+      <ZoneOnboarding zones={status?.zones ?? []} busy={busy} onConfirm={confirmZone} />
       <DomainRoutes status={status} />
     </>
   );
 }
 
-function OAuthCompletionForm({
-  resources,
+function ZoneOnboarding({
+  zones,
   busy,
-  onSubmit,
-  onRetry,
+  onConfirm,
 }: {
-  resources: OAuthResources | null;
+  zones: DomainZone[];
   busy: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onRetry: () => void;
+  onConfirm: (apex: string) => void;
 }) {
-  if (!resources || busy === "oauth-options") {
-    return (
-      <div className="grid min-h-28 place-items-center">
-        <span className="loading loading-spinner" />
-      </div>
-    );
-  }
-  if (resources.zones.length === 0) {
-    return (
-      <div className="alert alert-warning mt-3">
-        <span>
-          No active Cloudflare DNS zone is available. Add a domain to the authorized account, then
-          retry discovery.
-        </span>
-        <button type="button" className="btn btn-sm" onClick={onRetry}>
-          Retry
-        </button>
-      </div>
-    );
-  }
+  const pending = zones.filter((zone) => zone.state !== "active");
+  if (pending.length === 0) return null;
   return (
-    <form method="post" onSubmit={onSubmit} className="mt-3 grid gap-4">
-      <label className="form-control">
-        <span className="label-text mb-1">Cloudflare zone</span>
-        <select name="zone" required className="select select-bordered w-full">
-          {resources.zones.map((zone) => (
-            <option key={zone.id} value={`${zone.accountId}:${zone.id}`}>
-              {zone.accountName} · {zone.name}
-            </option>
+    <section className="card mt-5 border border-warning/40 bg-base-100">
+      <div className="card-body">
+        <h2 className="card-title">Domain nameserver setup required</h2>
+        <div className="grid gap-4">
+          {pending.map((zone) => (
+            <article key={zone.apex} className="rounded-box border border-base-300 p-4">
+              <h3 className="font-semibold">{zone.apex}</h3>
+              <p className="mt-1 text-sm text-base-content/70">
+                Copy every DNS record from the current provider into Cloudflare before replacing
+                nameservers{zone.originalRegistrar ? ` at ${zone.originalRegistrar}` : ""}. Missing
+                mail, verification, or undiscovered subdomain records can cause an outage.
+              </p>
+              <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-[11rem_1fr]">
+                <dt className="text-base-content/55">Cloudflare nameservers</dt>
+                <dd className="space-y-1 font-mono">
+                  {zone.assignedNameservers.map((nameserver) => (
+                    <div key={nameserver}>{nameserver}</div>
+                  ))}
+                </dd>
+                <dt className="text-base-content/55">Currently observed</dt>
+                <dd className="break-words font-mono">
+                  {zone.observedNameservers.join(", ") || "Not detected"}
+                </dd>
+              </dl>
+              <div className="mt-3">
+                <h4 className="text-sm font-medium">Publicly observable apex records</h4>
+                {zone.observedRecords.length > 0 ? (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="table table-xs">
+                      <tbody>
+                        {zone.observedRecords.map((record) => (
+                          <tr key={`${record.type}:${record.value}`}>
+                            <th>{record.type}</th>
+                            <td className="break-all font-mono">{record.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-base-content/60">
+                    No common apex records detected.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-base-content/60">
+                  This is advisory only: public DNS cannot enumerate the zone or discover every
+                  subdomain. Compare the complete record list in the current provider dashboard.
+                </p>
+              </div>
+              <div className="alert alert-warning mt-3 text-sm">
+                Disable an existing registrar DNSSEC DS record before changing nameservers.
+                Re-enable DNSSEC through Cloudflare only after the zone is active.
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm mt-3"
+                disabled={!!busy}
+                onClick={() => onConfirm(zone.apex)}
+              >
+                {busy === `zone:${zone.apex}` && <span className="loading loading-spinner" />}
+                {zone.inventoryConfirmed ? "Check delegation" : "I copied every DNS record"}
+              </button>
+            </article>
           ))}
-        </select>
-      </label>
-      <label className="form-control">
-        <span className="label-text mb-1">Tunnel name</span>
-        <input required name="tunnelName" defaultValue="nixship" className="input input-bordered" />
-      </label>
-      <label className="form-control">
-        <span className="label-text mb-1">Dashboard hostname (optional)</span>
-        <input
-          name="dashboardHostname"
-          placeholder="console.example.com"
-          className="input input-bordered"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={busy === "oauth-complete"}
-        className="btn btn-primary w-full sm:w-auto"
-      >
-        {busy === "oauth-complete" && <span className="loading loading-spinner" />}
-        Create and enable tunnel
-      </button>
-    </form>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function ManualConnectionForm({
+function TokenConnectionForm({
   busy,
   onSubmit,
+  accountId,
+  dashboardHostname,
 }: {
   busy: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  accountId?: string | null;
+  dashboardHostname?: string | null;
 }) {
   return (
-    <form method="post" onSubmit={onSubmit} className="grid gap-3">
+    <form method="post" onSubmit={onSubmit} className="mt-3 grid gap-3">
       <p className="text-sm text-base-content/65">
-        Use a token restricted to Tunnel edit, Zone read, and DNS edit.
+        Required permissions: Tunnel edit, Zone read/edit, and DNS edit. Restrict the token to the
+        account this node will manage.
       </p>
       <label className="form-control">
         <span className="label-text mb-1">Account ID</span>
-        <input required name="accountId" className="input input-bordered font-mono" />
-      </label>
-      <label className="form-control">
-        <span className="label-text mb-1">Zone ID</span>
-        <input required name="zoneId" className="input input-bordered font-mono" />
+        <input
+          required
+          name="accountId"
+          defaultValue={accountId ?? ""}
+          className="input input-bordered font-mono"
+        />
       </label>
       <label className="form-control">
         <span className="label-text mb-1">API token</span>
@@ -418,13 +366,18 @@ function ManualConnectionForm({
         <span className="label-text mb-1">Dashboard hostname (optional)</span>
         <input
           name="dashboardHostname"
+          defaultValue={dashboardHostname ?? ""}
           placeholder="console.example.com"
           className="input input-bordered"
         />
       </label>
-      <button type="submit" disabled={busy === "manual"} className="btn w-full sm:w-auto">
-        {busy === "manual" && <span className="loading loading-spinner" />}
-        Save manual connection
+      <button
+        type="submit"
+        disabled={busy === "token"}
+        className="btn btn-primary w-full sm:w-auto"
+      >
+        {busy === "token" && <span className="loading loading-spinner" />}
+        Connect Cloudflare
       </button>
     </form>
   );
@@ -433,12 +386,12 @@ function ManualConnectionForm({
 function ConfiguredConnection({
   status,
   busy,
-  onReconnect,
+  onConfigure,
   onSaveDashboard,
 }: {
   status: Status;
   busy: string;
-  onReconnect: () => void;
+  onConfigure: (event: FormEvent<HTMLFormElement>) => void;
   onSaveDashboard: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -448,11 +401,9 @@ function ConfiguredConnection({
           <h2 className="card-title">Persistent tunnel</h2>
           <dl className="grid gap-3 text-sm sm:grid-cols-[10rem_1fr]">
             <dt className="text-base-content/55">Authorization</dt>
-            <dd>{status.connectionMethod === "oauth" ? "Cloudflare OAuth" : "Manual API token"}</dd>
+            <dd>Restricted API token</dd>
             <dt className="text-base-content/55">Account</dt>
             <dd className="break-all font-mono">{status.accountId}</dd>
-            <dt className="text-base-content/55">Zone</dt>
-            <dd className="break-all font-mono">{status.zoneId}</dd>
             <dt className="text-base-content/55">Tunnel</dt>
             <dd className="break-all font-mono">{status.tunnelId || "Creating…"}</dd>
             <dt className="text-base-content/55">State</dt>
@@ -470,16 +421,17 @@ function ConfiguredConnection({
               </span>
             </dd>
           </dl>
-          {status.oauth.available && (
-            <button
-              type="button"
-              className="btn btn-sm mt-2 w-full sm:w-auto"
-              disabled={!!busy}
-              onClick={onReconnect}
-            >
-              Reauthorize Cloudflare
-            </button>
-          )}
+          <details className="collapse collapse-arrow mt-2 border border-base-300">
+            <summary className="collapse-title text-sm font-medium">Replace API token</summary>
+            <div className="collapse-content">
+              <TokenConnectionForm
+                busy={busy}
+                onSubmit={onConfigure}
+                accountId={status.accountId}
+                dashboardHostname={status.dashboardHostname}
+              />
+            </div>
+          </details>
         </div>
       </section>
 
@@ -530,8 +482,8 @@ function DomainRoutes({ status }: { status: Status | null }) {
           <div>
             <h2 className="card-title">Application domain routes</h2>
             <p className="mt-1 text-sm text-base-content/65">
-              Project hostnames in authorized zones are synchronized automatically. Other providers
-              continue using each application’s stable LAN origin.
+              Project hostnames in active Cloudflare zones are synchronized automatically. Pending
+              hostnames wait for zone activation while the stable LAN origin remains available.
             </p>
           </div>
           <Link href="/apps" className="btn btn-sm">

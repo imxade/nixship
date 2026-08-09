@@ -104,9 +104,12 @@ export function applicationAccessLinks(input: {
             ? "configured"
             : "unavailable",
       note:
-        route.status === "external"
-          ? "DNS is not managed by this Cloudflare connection."
-          : (route.lastError ?? (routeReady ? serviceNote : null)),
+        route.lastError ??
+        (routeReady
+          ? serviceNote
+          : route.status === "pending"
+            ? "Cloudflare DNS setup is still pending."
+            : null),
     });
   }
   return links;

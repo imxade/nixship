@@ -55,20 +55,15 @@ not an authorization boundary.
 
 ## Secret storage
 
-- Application values, GitHub private key/secret, Harbur read tokens, Cloudflare API/tunnel tokens,
-  OAuth PKCE verifiers and OAuth access/refresh tokens are encrypted with
-  AES-256-GCM.
+- Application values, GitHub private key/secret, Harbur read tokens and
+  Cloudflare API/tunnel tokens are encrypted with AES-256-GCM.
 - Master key comes from `PLATFORM_MASTER_KEY` or a mode-0600 local key file.
 - Existing values are never sent back to the dashboard.
 - Enter or rotate secrets only through an HTTPS dashboard route or a trusted private
   LAN. Plain LAN HTTP does not protect secrets in transit from observers on that
   network.
-- Cloudflare OAuth starts only for an authenticated owner/admin. Its random
-  state is stored as a hash, expires after ten minutes and is deleted before
-  code exchange; PKCE S256 binds the returned code to the initiating node.
-- Cloudflare OAuth defaults disabled and is dynamically loaded only when the
-  feature switch and all public-client settings are present. Manual API-token
-  access and account-free Quick Tunnels do not load or depend on the provider.
+- Only an authenticated owner/admin can store or replace the restricted
+  Cloudflare API token. The existing secret is never returned.
 - Quick Tunnels create temporary public hostnames automatically unless disabled.
   Dashboard access still requires Nix Ship authentication. Hosted applications receive
   no automatic access control; their temporary URL must be treated as public and the
@@ -78,6 +73,11 @@ not an authorization boundary.
   Tunnels that outlive an unsuccessful control-plane start.
 - Persistent Cloudflare dashboard and application hostnames are explicitly supplied
   by the operator and created only in authorized zones.
+- One case-insensitive assignment registry prevents an exact hostname from belonging
+  to more than one application or the dashboard. Cloudflare DNS writes refuse foreign
+  A, AAAA and CNAME records; cleanup requires both the expected tunnel target and this
+  instance's ownership comment. Named-tunnel reconciliation is serialized and does
+  not mutate Quick Tunnel rows or processes.
 - Logs attempt no magical generic redaction; applications can transform or exfiltrate any secret provided to them.
 
 For the integrated Android app, replace the local key-file fallback with Android Keystore wrapping.
@@ -102,6 +102,5 @@ For the integrated Android app, replace the local key-file fallback with Android
 - Add optional local TLS and passkeys.
 - Add interrupted-write and disk-full fault injection to backup/restore tests.
 - Obtain independent security review before exposing the dashboard to the internet.
-- Publish and independently review the distributor Cloudflare OAuth client,
-  verified callback domain and requested scopes before enabling OAuth in a
-  release build.
+- Run the complete zone-onboarding and custom-domain lifecycle against a
+  dedicated live Cloudflare account before release.

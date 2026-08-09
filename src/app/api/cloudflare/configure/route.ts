@@ -14,10 +14,6 @@ const schema = z.object({
     .string()
     .trim()
     .regex(/^[0-9a-f]{32}$/i, "Enter a valid Cloudflare account ID"),
-  zoneId: z
-    .string()
-    .trim()
-    .regex(/^[0-9a-f]{32}$/i, "Enter a valid Cloudflare zone ID"),
   apiToken: z.string().trim().min(10).max(1000),
   tunnelName: z
     .string()
@@ -40,11 +36,10 @@ export async function POST(request: NextRequest) {
       action: "cloudflare.configured",
       details: {
         accountId: input.accountId,
-        zoneId: input.zoneId,
         tunnelName: input.tunnelName,
         dashboardHostname: input.dashboardHostname,
       },
     });
-    return (await getRuntime()).cloudflare.status(user.id);
+    return (await getRuntime()).cloudflare.status();
   });
 }

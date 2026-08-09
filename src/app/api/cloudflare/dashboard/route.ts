@@ -26,6 +26,6 @@ export async function PUT(request: NextRequest) {
       action: "cloudflare.dashboard_hostname.updated",
       details: { hostname: input.hostname },
     });
-    return runtime.cloudflare.status(user.id);
+    return runtime.cloudflare.status();
   });
 }

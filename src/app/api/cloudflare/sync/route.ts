@@ -13,6 +13,6 @@ export async function POST(request: NextRequest) {
     requireRole(user, ["owner", "admin"]);
     const runtime = await getRuntime();
     await runtime.cloudflare.syncIngress();
-    return runtime.cloudflare.status(user.id);
+    return runtime.cloudflare.status();
   });
 }

@@ -24,8 +24,8 @@
 - Quick Tunnels currently have a global opt-out, not a per-application exposure
   switch. A hosted application that should not be public must enforce its own
   authentication or the operator must disable Quick Tunnels for the node.
-- Cloudflare named-tunnel/OAuth integration has not been exercised against a live
-  account in this environment.
+- Cloudflare API-token named-tunnel integration has not been exercised against a
+  live account in this environment.
 - The current Android delivery path requires Nix-on-Droid and terminal setup. The plug-and-play APK, native wrapper and Android release artifacts are a roadmap target for a separate repository, not outputs of this repository.
 - The Maestro CI login flow has passed on an Android 15 x86_64 development
   emulator, but no physical ARM64 Nix-on-Droid/Maestro result has been recorded;

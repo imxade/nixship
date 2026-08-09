@@ -36,18 +36,21 @@ Only trusted GitHub repositories and verified immutable Harbur snapshots are acc
 10. Desired application state, queue state, users, sessions, integrations, and history persist in SQLite.
 11. Secrets are encrypted at rest and existing secret values are never returned by APIs.
 12. Host and per-application resource data are shown without claiming exact OOM causality when evidence is insufficient.
-13. Cloudflare Tunnel remains optional. A configured public OAuth client uses
-    Authorization Code with PKCE, single-use state and encrypted refresh tokens
-    to discover accounts/zones and create a persistent named tunnel. Manual
-    least-privilege API tokens remain a fallback.
+13. Cloudflare Tunnel remains optional. An owner-supplied least-privilege API
+    token is encrypted at rest and used to discover zones, onboard missing full
+    zones, manage DNS and create a persistent named tunnel.
 14. Restart recovery must preserve running application processes where the host permits it.
-15. Web applications may have multiple normalized custom domains. DNS and TLS may be managed by Cloudflare or by another provider targeting the application's stable LAN port.
+15. Web applications may have multiple normalized custom domains. Apex domains and
+    subdomains are independent assignments, but one normalized hostname can belong
+    to only one application or the dashboard across the node. Persistent public
+    custom domains are managed through the optional Cloudflare named tunnel while
+    each application keeps its stable LAN origin.
 16. Failed password checks are bounded in one-hour windows by source and username, and throttled responses provide retry timing.
-17. Every project hostname exposes a persisted Cloudflare route result: managed, external, pending/not configured, or failed.
-18. Cloudflare credentials are stored only after account/zone ownership and
-    tunnel-list access are verified. OAuth state expires, is consumed exactly
-    once and remains bound to the authenticated user who started authorization.
-    Nix Ship does not create account-free or Vercel-style default public domains.
+17. Every project hostname exposes a persisted Cloudflare route result: managed,
+    pending/not configured, or failed.
+18. Cloudflare credentials are stored only after token and account tunnel access
+    are verified. Stored tokens are never returned. Nix Ship does not create
+    account-free or Vercel-style default persistent public domains.
 19. Authenticated application, user, integration and settings flows remain
     operable without horizontal overflow on phone, tablet and desktop screens.
 20. Every authenticated user can change their own password after confirming the
@@ -69,6 +72,10 @@ Only trusted GitHub repositories and verified immutable Harbur snapshots are acc
 25. A healthy retained deployment can be promoted without a rebuild when the project
     has a production domain. The production pointer and stable proxy route change
     atomically; projects without a domain reject promotion without changing state.
+26. Persistent-domain reconciliation must not overwrite or delete an existing DNS
+    record unless its tunnel target and Nix Ship ownership marker prove that this
+    instance owns it. Named-tunnel configuration writes are serialized. Persistent
+    domain assignment must not start, stop, rotate, or otherwise mutate Quick Tunnels.
 
 ## Android distribution tracks
 

@@ -19,6 +19,20 @@ const cloudflareFetch = vi.fn(async (input: string | URL | Request, init?: Reque
   const url = String(input);
   apiCalls.push({ url, init });
   const parsed = new URL(url);
+  if (parsed.hostname === "cloudflare-dns.com") {
+    const apex = parsed.searchParams.get("name");
+    const nameservers =
+      apex === "example.com"
+        ? ["alice.ns.cloudflare.com.", "bob.ns.cloudflare.com."]
+        : ["ns1.external.test.", "ns2.external.test."];
+    return new Response(
+      JSON.stringify({
+        Status: 0,
+        Answer: nameservers.map((data) => ({ type: 2, data })),
+      }),
+      { status: 200, headers: { "content-type": "application/dns-json" } },
+    );
+  }
   if (parsed.pathname.endsWith("/configurations") && failNextConfiguration) {
     failNextConfiguration = false;
     return new Response(
@@ -26,34 +40,84 @@ const cloudflareFetch = vi.fn(async (input: string | URL | Request, init?: Reque
       { status: 500, headers: { "content-type": "application/json" } },
     );
   }
+  if (parsed.pathname.startsWith("/client/v4/accounts/other-account/")) {
+    return new Response(
+      JSON.stringify({ success: false, errors: [{ message: "account access denied" }] }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    );
+  }
   let result: unknown = {};
   if (parsed.pathname === "/client/v4/user/tokens/verify") {
     result = { id: "token-id", status: "active" };
-  } else if (parsed.pathname === "/client/v4/zones/zone-primary") {
-    result = { id: "zone-primary", name: "example.com", account: { id: "account" } };
   } else if (parsed.pathname === "/client/v4/accounts/account/cfd_tunnel" && parsed.search) {
     result = [];
   } else if (parsed.pathname.endsWith("/dns_records") && parsed.search) {
     const hostname = parsed.searchParams.get("name");
     if (hostname === "foreign.example.com") {
-      result = [{ id: "foreign-record", content: "tunnel-id.cfargotunnel.com", comment: null }];
+      result = [
+        {
+          id: "foreign-record",
+          type: "CNAME",
+          content: "tunnel-id.cfargotunnel.com",
+          comment: null,
+        },
+      ];
     } else if (hostname === "changed.example.com") {
       result = [
-        { id: "changed-record", content: "other.example.net", comment: "Managed by Nix Ship" },
+        {
+          id: "changed-record",
+          type: "CNAME",
+          content: "other.example.net",
+          comment: "Managed by Nix Ship",
+        },
+      ];
+    } else if (hostname === "occupied.example.com") {
+      result = [
+        {
+          id: "occupied-record",
+          type: "CNAME",
+          content: "cname.vercel-dns.com",
+          comment: null,
+        },
       ];
     } else if (hostname?.endsWith(".example.com")) {
       result = [
         {
           id: "dns-record",
+          type: "CNAME",
           content: "tunnel-id.cfargotunnel.com",
-          comment: hostname === "stale.example.com" ? "Managed by Nix Ship" : "Managed by Nix Ship",
+          comment: "Managed by Nix Ship",
         },
       ];
     } else {
       result = [];
     }
+  } else if (parsed.pathname.endsWith("/dns_records") && init?.method === "POST") {
+    result = { id: "created-dns-record" };
   } else if (parsed.pathname === "/client/v4/zones") {
-    result = [];
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body)) as { name: string };
+      result = {
+        id: `zone-${body.name}`,
+        name: body.name,
+        status: "pending",
+        name_servers: ["alice.ns.cloudflare.com", "bob.ns.cloudflare.com"],
+        original_name_servers: ["ns1.external.test", "ns2.external.test"],
+      };
+    } else {
+      result =
+        !parsed.searchParams.get("name") || parsed.searchParams.get("name") === "example.com"
+          ? [
+              {
+                id: "zone-primary",
+                name: "example.com",
+                status: "active",
+                name_servers: ["alice.ns.cloudflare.com", "bob.ns.cloudflare.com"],
+                account: { id: "account" },
+              },
+            ]
+          : [];
+    }
   }
   return new Response(JSON.stringify({ success: true, result }), {
     status: 200,
@@ -77,11 +141,18 @@ db.prepare(
 db.prepare(
   "INSERT INTO application_domains(hostname, app_id, created_at, updated_at) VALUES (?, 'app-1', ?, ?)",
 ).run("api.external.net", now, now);
+const insertAssignment = db.prepare(
+  `INSERT INTO domain_assignments(
+    hostname, apex, target_type, app_id, state, ownership_marker, created_at, updated_at
+  ) VALUES (?, ?, 'application', 'app-1', 'waiting-zone', ?, ?, ?)`,
+);
+insertAssignment.run("api.example.com", "example.com", "marker-api", now, now);
+insertAssignment.run("api.external.net", "external.net", "marker-external", now, now);
 db.prepare(
   `INSERT INTO cloudflare_config(
-    singleton, account_id, zone_id, api_token_encrypted, tunnel_id, tunnel_name,
+    singleton, account_id, api_token_encrypted, tunnel_id, tunnel_name,
     tunnel_token_encrypted, enabled, created_at, updated_at
-  ) VALUES (1, 'account', 'zone-primary', ?, 'tunnel-id', 'nixship', ?, 1, ?, ?)`,
+  ) VALUES (1, 'account', ?, 'tunnel-id', 'nixship', ?, 1, ?, ?)`,
 ).run(
   secrets.encryptSecret("cloudflare-test-token"),
   secrets.encryptSecret("tunnel-test-token"),
@@ -96,11 +167,10 @@ afterAll(() => {
 });
 
 describe("Cloudflare application routes", () => {
-  it("verifies token, zone ownership, and tunnel access before saving", async () => {
+  it("verifies token, zone discovery, and tunnel access before saving", async () => {
     const controller = new CloudflareController();
     await controller.configure({
       accountId: "account",
-      zoneId: "zone-primary",
       apiToken: "replacement-test-token",
       tunnelName: "nixship",
     });
@@ -113,19 +183,18 @@ describe("Cloudflare application routes", () => {
     ).toBe(true);
   });
 
-  it("rejects a zone from another account before replacing stored configuration", async () => {
+  it("rejects an inaccessible account before replacing stored configuration", async () => {
     const controller = new CloudflareController();
 
     await expect(
       controller.configure({
         accountId: "other-account",
-        zoneId: "zone-primary",
         apiToken: "replacement-test-token",
         tunnelName: "nixship",
       }),
     ).rejects.toMatchObject({
-      status: 400,
-      code: "cloudflare_zone_account_mismatch",
+      status: 502,
+      code: "cloudflare_api_failed",
     });
     expect(
       db.prepare("SELECT account_id FROM cloudflare_config WHERE singleton = 1").get(),
@@ -143,7 +212,6 @@ describe("Cloudflare application routes", () => {
     await expect(
       new CloudflareController().configure({
         accountId: "account",
-        zoneId: "zone-primary",
         apiToken: "candidate-test-token",
         tunnelName: "nixship",
         dashboardHostname: "console.example.com",
@@ -161,7 +229,41 @@ describe("Cloudflare application routes", () => {
     expect(after.dashboard_hostname).toBe(before.dashboard_hostname);
   });
 
-  it("reports managed and external domains and removes stale managed DNS", async () => {
+  it("refuses to overwrite a hostname already used by foreign DNS", async () => {
+    db.prepare(
+      "INSERT INTO application_domains(hostname, app_id, created_at, updated_at) VALUES (?, 'app-1', ?, ?)",
+    ).run("occupied.example.com", now, now);
+    insertAssignment.run("occupied.example.com", "example.com", "marker-occupied", now, now);
+    const callOffset = apiCalls.length;
+
+    await expect(new CloudflareController().syncIngress()).rejects.toMatchObject({
+      status: 409,
+      code: "domain_dns_conflict",
+    });
+
+    expect(
+      db
+        .prepare("SELECT state, last_error FROM domain_assignments WHERE hostname = ?")
+        .get("occupied.example.com"),
+    ).toMatchObject({
+      state: "conflict",
+      last_error: expect.stringContaining("not owned by this Nix Ship instance"),
+    });
+    expect(
+      apiCalls
+        .slice(callOffset)
+        .some(
+          (call) =>
+            ["PUT", "DELETE"].includes(call.init?.method ?? "") &&
+            call.url.endsWith("/dns_records/occupied-record"),
+        ),
+    ).toBe(false);
+
+    db.prepare("DELETE FROM application_domains WHERE hostname = ?").run("occupied.example.com");
+    db.prepare("DELETE FROM domain_assignments WHERE hostname = ?").run("occupied.example.com");
+  });
+
+  it("reports managed and pending-zone domains and removes stale managed DNS", async () => {
     const controller = new CloudflareController();
     await controller.syncIngress();
 
@@ -179,10 +281,32 @@ describe("Cloudflare application routes", () => {
         appName: "Example API",
         hostname: "api.external.net",
         publicPort: 10042,
-        status: "external",
-        zoneId: null,
+        status: "pending",
+        zoneId: "zone-external.net",
       },
     ]);
+    expect(
+      db
+        .prepare(
+          "SELECT apex, state, assigned_nameservers, original_nameservers, observed_records FROM domain_zones WHERE apex = ?",
+        )
+        .get("external.net"),
+    ).toEqual({
+      apex: "external.net",
+      state: "pending-delegation",
+      assigned_nameservers: JSON.stringify(["alice.ns.cloudflare.com", "bob.ns.cloudflare.com"]),
+      original_nameservers: JSON.stringify(["ns1.external.test", "ns2.external.test"]),
+      observed_records: "[]",
+    });
+    expect(
+      db
+        .prepare("SELECT apex, state, zone_id FROM domain_assignments WHERE hostname = ?")
+        .get("api.external.net"),
+    ).toEqual({
+      apex: "external.net",
+      state: "waiting-zone",
+      zone_id: "zone-external.net",
+    });
 
     const configurationCall = apiCalls.find((call) =>
       call.url.endsWith("/cfd_tunnel/tunnel-id/configurations"),
@@ -196,18 +320,22 @@ describe("Cloudflare application routes", () => {
     ]);
 
     db.prepare("DELETE FROM application_domains").run();
-    const insertStatus = db.prepare(
-      `INSERT INTO cloudflare_domain_status(
-        hostname, app_id, status, zone_id, last_synced_at
-      ) VALUES (?, 'app-1', 'managed', 'zone-primary', ?)`,
+    const insertRemovingAssignment = db.prepare(
+      `INSERT INTO domain_assignments(
+        hostname, apex, target_type, app_id, state, zone_id, tunnel_id,
+        ownership_marker, created_at, updated_at
+      ) VALUES (?, 'example.com', 'application', 'app-1', 'removing',
+        'zone-primary', 'tunnel-id', ?, ?, ?)`,
     );
-    insertStatus.run("foreign.example.com", now);
-    insertStatus.run("changed.example.com", now);
-    insertStatus.run("stale.example.com", now);
+    insertRemovingAssignment.run("foreign.example.com", "marker-foreign", now, now);
+    insertRemovingAssignment.run("changed.example.com", "marker-changed", now, now);
+    insertRemovingAssignment.run("stale.example.com", "marker-stale", now, now);
     await controller.syncIngress();
 
     expect(controller.status().routes).toEqual([]);
-    expect(db.prepare("SELECT * FROM cloudflare_domain_status").all()).toEqual([]);
+    expect(
+      db.prepare("SELECT hostname FROM domain_assignments WHERE state = 'removing'").all(),
+    ).toEqual([]);
     expect(
       apiCalls.some(
         (call) =>

@@ -2,14 +2,21 @@ import type { ChildProcess } from "node:child_process";
 import { normalizeDomain } from "./app-service.ts";
 import { cloudflareApiRequest } from "./cloudflare-api.ts";
 import {
-  type CloudflareOAuthTokens,
-  cloudflareAuthorizationAccessToken,
-  cloudflareOAuthStatus,
-} from "./cloudflare-oauth.ts";
+  type DomainZoneSummary,
+  domainZoneSummaries,
+  ensureDomainZone,
+} from "./cloudflare-zones.ts";
 import { spawnLogged } from "./command.ts";
 import { config } from "./config.ts";
 import { decryptSecret, encryptSecret } from "./crypto.ts";
 import { getDb, nowIso, setSetting, setting } from "./db.ts";
+import {
+  domainAssignment,
+  domainOwnershipComment,
+  ownsDomainComment,
+  replaceDashboardDomainAssignment,
+  updateDomainAssignment,
+} from "./domain-assignments.ts";
 import { HttpError } from "./errors.ts";
 import { logger } from "./logger.ts";
 import { paths } from "./paths.ts";
@@ -22,16 +29,12 @@ import { synchronizeGitHubWebhook } from "./public-webhook.ts";
 
 interface CloudflareRow {
   account_id: string;
-  zone_id: string;
   api_token_encrypted: string;
   tunnel_id: string | null;
-  tunnel_name: string | null;
+  tunnel_name: string;
   tunnel_token_encrypted: string | null;
   dashboard_hostname: string | null;
   enabled: number;
-  auth_method: "api_token" | "oauth";
-  oauth_refresh_token_encrypted: string | null;
-  oauth_access_token_expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,7 +44,7 @@ export interface CloudflareDomainRoute {
   appName: string;
   hostname: string;
   publicPort: number;
-  status: "not-configured" | "pending" | "managed" | "external" | "error";
+  status: "not-configured" | "pending" | "managed" | "error";
   zoneId: string | null;
   lastError: string | null;
   lastSyncedAt: string | null;
@@ -51,17 +54,16 @@ export class CloudflareController {
   private childProcess: ChildProcess | null = null;
   private monitorTimer: NodeJS.Timeout | null = null;
   private processIdentity: ProcessIdentity | null = null;
+  private syncTail: Promise<void> = Promise.resolve();
 
-  status(userId?: string): {
+  status(): {
     configured: boolean;
     enabled: boolean;
     running: boolean;
-    connectionMethod: "api_token" | "oauth" | null;
     accountId: string | null;
-    zoneId: string | null;
     tunnelId: string | null;
     dashboardHostname: string | null;
-    oauth: { available: boolean; pending: boolean };
+    zones: DomainZoneSummary[];
     routes: CloudflareDomainRoute[];
   } {
     const row = getCloudflareConfig();
@@ -69,60 +71,35 @@ export class CloudflareController {
       configured: Boolean(row),
       enabled: Boolean(row?.enabled),
       running: this.isRunning(),
-      connectionMethod: row?.auth_method ?? null,
       accountId: row?.account_id ?? null,
-      zoneId: row?.zone_id ?? null,
       tunnelId: row?.tunnel_id ?? null,
       dashboardHostname: row?.dashboard_hostname ?? null,
-      oauth: cloudflareOAuthStatus(userId),
+      zones: domainZoneSummaries(),
       routes: cloudflareDomainRoutes(Boolean(row)),
     };
   }
 
   async configure(input: {
     accountId: string;
-    zoneId: string;
     apiToken: string;
     tunnelName: string;
     dashboardHostname?: string;
   }): Promise<void> {
-    await validateCloudflareAccess(input.accountId, input.zoneId, input.apiToken);
+    await validateCloudflareAccess(input.accountId, input.apiToken);
     await this.configureCredential({
       accountId: input.accountId,
-      zoneId: input.zoneId,
-      accessToken: input.apiToken,
-      refreshToken: null,
-      expiresAt: null,
-      authMethod: "api_token",
+      apiToken: input.apiToken,
       tunnelName: input.tunnelName,
       dashboardHostname: input.dashboardHostname,
     });
-  }
-
-  async configureOAuth(input: {
-    accountId: string;
-    zoneId: string;
-    tokens: CloudflareOAuthTokens;
-    tunnelName: string;
-    dashboardHostname?: string;
-  }): Promise<void> {
-    await validateCloudflareResourceAccess(input.accountId, input.zoneId, input.tokens.accessToken);
-    await this.configureCredential({
-      ...input,
-      accessToken: input.tokens.accessToken,
-      refreshToken: input.tokens.refreshToken,
-      expiresAt: input.tokens.expiresAt,
-      authMethod: "oauth",
-    });
-    await this.enable();
   }
 
   async setDashboardHostname(hostname?: string): Promise<void> {
     const row = getCloudflareConfig();
     if (!row) throw new HttpError(409, "Cloudflare is not configured", "cloudflare_not_configured");
     const dashboardHostname = hostname ? normalizeDomain(hostname) : null;
-    assertDashboardHostnameAvailable(dashboardHostname);
     if (dashboardHostname === row.dashboard_hostname) return;
+    replaceDashboardDomainAssignment(row.dashboard_hostname, dashboardHostname);
     getDb()
       .prepare(
         "UPDATE cloudflare_config SET dashboard_hostname = ?, updated_at = ? WHERE singleton = 1",
@@ -143,6 +120,7 @@ export class CloudflareController {
           "UPDATE cloudflare_config SET dashboard_hostname = ?, updated_at = ? WHERE singleton = 1",
         )
         .run(row.dashboard_hostname, nowIso());
+      replaceDashboardDomainAssignment(dashboardHostname, row.dashboard_hostname);
       throw error;
     }
     if (row.dashboard_hostname) await deleteManagedDnsRecord(row, row.dashboard_hostname);
@@ -153,19 +131,15 @@ export class CloudflareController {
 
   private async configureCredential(input: {
     accountId: string;
-    zoneId: string;
-    accessToken: string;
-    refreshToken: string | null;
-    expiresAt: string | null;
-    authMethod: "api_token" | "oauth";
+    apiToken: string;
     tunnelName: string;
     dashboardHostname?: string;
   }): Promise<void> {
     const dashboardHostname = input.dashboardHostname
       ? normalizeDomain(input.dashboardHostname)
       : null;
-    assertDashboardHostnameAvailable(dashboardHostname);
     const previous = getCloudflareConfig();
+    replaceDashboardDomainAssignment(previous?.dashboard_hostname ?? null, dashboardHostname);
     const replaceTunnel = Boolean(
       previous &&
         (previous.account_id !== input.accountId || previous.tunnel_name !== input.tunnelName),
@@ -174,29 +148,21 @@ export class CloudflareController {
     const now = nowIso();
     getDb()
       .prepare(
-        `INSERT INTO cloudflare_config(singleton, account_id, zone_id, api_token_encrypted, tunnel_name,
-          dashboard_hostname, enabled, auth_method, oauth_refresh_token_encrypted,
-          oauth_access_token_expires_at, created_at, updated_at)
-         VALUES (1, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
-         ON CONFLICT(singleton) DO UPDATE SET account_id=excluded.account_id, zone_id=excluded.zone_id,
+        `INSERT INTO cloudflare_config(singleton, account_id, api_token_encrypted, tunnel_name,
+          dashboard_hostname, enabled, created_at, updated_at)
+         VALUES (1, ?, ?, ?, ?, 0, ?, ?)
+         ON CONFLICT(singleton) DO UPDATE SET account_id=excluded.account_id,
           api_token_encrypted=excluded.api_token_encrypted, tunnel_name=excluded.tunnel_name,
           dashboard_hostname=excluded.dashboard_hostname,
-          auth_method=excluded.auth_method,
-          oauth_refresh_token_encrypted=excluded.oauth_refresh_token_encrypted,
-          oauth_access_token_expires_at=excluded.oauth_access_token_expires_at,
           tunnel_id=CASE WHEN account_id != excluded.account_id OR tunnel_name != excluded.tunnel_name THEN NULL ELSE tunnel_id END,
           tunnel_token_encrypted=CASE WHEN account_id != excluded.account_id OR tunnel_name != excluded.tunnel_name THEN NULL ELSE tunnel_token_encrypted END,
           updated_at=excluded.updated_at`,
       )
       .run(
         input.accountId,
-        input.zoneId,
-        encryptSecret(input.accessToken),
+        encryptSecret(input.apiToken),
         input.tunnelName,
         dashboardHostname,
-        input.authMethod,
-        input.refreshToken ? encryptSecret(input.refreshToken) : null,
-        input.expiresAt,
         now,
         now,
       );
@@ -224,6 +190,7 @@ export class CloudflareController {
         );
       }
       restoreCloudflareConfig(previous);
+      replaceDashboardDomainAssignment(dashboardHostname, previous?.dashboard_hostname ?? null);
       if (previous) {
         await this.syncIngress().catch((restoreError) =>
           logger.error("Unable to restore previous Cloudflare ingress", {
@@ -231,8 +198,6 @@ export class CloudflareController {
           }),
         );
         if (previous.enabled && replaceTunnel) this.startProcess();
-      } else {
-        getDb().prepare("DELETE FROM cloudflare_domain_status").run();
       }
       throw error;
     }
@@ -276,15 +241,26 @@ export class CloudflareController {
   }
 
   async syncIngress(): Promise<void> {
+    const run = this.syncTail.then(
+      () => this.syncIngressNow(),
+      () => this.syncIngressNow(),
+    );
+    this.syncTail = run.catch(() => undefined);
+    return run;
+  }
+
+  private async syncIngressNow(): Promise<void> {
     const row = getCloudflareConfig();
     if (!row?.tunnel_id) return;
     const ingress: Array<{ hostname?: string; service: string }> = [];
     if (row.dashboard_hostname) {
-      await ensureDnsRecord(row, row.dashboard_hostname, true);
-      ingress.push({
-        hostname: row.dashboard_hostname,
-        service: `http://127.0.0.1:${config.PORT}`,
-      });
+      const zoneId = await ensureDnsRecord(row, row.dashboard_hostname);
+      if (zoneId) {
+        ingress.push({
+          hostname: row.dashboard_hostname,
+          service: `http://127.0.0.1:${config.PORT}`,
+        });
+      }
     }
     const domains = getDb()
       .prepare(
@@ -436,10 +412,13 @@ export function cloudflareDomainRoutes(configured = Boolean(getCloudflareConfig(
   const rows = getDb()
     .prepare(
       `SELECT d.hostname, d.app_id, a.name AS app_name, a.public_port,
-        s.status, s.zone_id, s.last_error, s.last_synced_at
+        da.state, da.zone_id, da.last_error, da.updated_at
        FROM application_domains d
        JOIN applications a ON a.id = d.app_id
-       LEFT JOIN cloudflare_domain_status s ON s.hostname = d.hostname
+       LEFT JOIN domain_assignments da
+        ON da.hostname = d.hostname
+        AND da.target_type = 'application'
+        AND da.app_id = d.app_id
        WHERE a.kind = 'web' AND a.public_port IS NOT NULL
        ORDER BY a.name COLLATE NOCASE, d.hostname`,
     )
@@ -448,10 +427,18 @@ export function cloudflareDomainRoutes(configured = Boolean(getCloudflareConfig(
     app_id: string;
     app_name: string;
     public_port: number;
-    status: "managed" | "external" | "error" | null;
+    state:
+      | "waiting-zone"
+      | "provisioning"
+      | "verifying"
+      | "active"
+      | "conflict"
+      | "error"
+      | "removing"
+      | null;
     zone_id: string | null;
     last_error: string | null;
-    last_synced_at: string | null;
+    updated_at: string | null;
   }>;
   return rows.map(
     (row): CloudflareDomainRoute => ({
@@ -459,16 +446,22 @@ export function cloudflareDomainRoutes(configured = Boolean(getCloudflareConfig(
       appName: row.app_name,
       hostname: row.hostname,
       publicPort: row.public_port,
-      status: configured ? (row.status ?? "pending") : "not-configured",
+      status: configured
+        ? row.state === "active"
+          ? "managed"
+          : row.state === "error" || row.state === "conflict"
+            ? "error"
+            : "pending"
+        : "not-configured",
       zoneId: row.zone_id,
       lastError: row.last_error,
-      lastSyncedAt: row.last_synced_at,
+      lastSyncedAt: row.updated_at,
     }),
   );
 }
 
 async function cfRequest<T>(row: CloudflareRow, path: string, init: RequestInit = {}): Promise<T> {
-  return cloudflareApiRequest<T>(await cloudflareAuthorizationAccessToken(row), path, init);
+  return cloudflareApiRequest<T>(decryptSecret(row.api_token_encrypted), path, init);
 }
 
 async function cfRequestWithToken<T>(
@@ -479,11 +472,7 @@ async function cfRequestWithToken<T>(
   return cloudflareApiRequest<T>(apiToken, path, init);
 }
 
-async function validateCloudflareAccess(
-  accountId: string,
-  zoneId: string,
-  apiToken: string,
-): Promise<void> {
+async function validateCloudflareAccess(accountId: string, apiToken: string): Promise<void> {
   const token = await cfRequestWithToken<{ status: "active" | "disabled" | "expired" }>(
     apiToken,
     "/user/tokens/verify",
@@ -495,42 +484,14 @@ async function validateCloudflareAccess(
       "cloudflare_token_inactive",
     );
   }
-  await validateCloudflareResourceAccess(accountId, zoneId, apiToken);
-}
-
-async function validateCloudflareResourceAccess(
-  accountId: string,
-  zoneId: string,
-  apiToken: string,
-): Promise<void> {
-  const zone = await cfRequestWithToken<{ id: string; account?: { id?: string } }>(
-    apiToken,
-    `/zones/${encodeURIComponent(zoneId)}`,
-  );
-  if (zone.id !== zoneId || zone.account?.id !== accountId) {
-    throw new HttpError(
-      400,
-      "The Cloudflare zone does not belong to the configured account",
-      "cloudflare_zone_account_mismatch",
-    );
-  }
   await cfRequestWithToken(
     apiToken,
     `/accounts/${encodeURIComponent(accountId)}/cfd_tunnel?per_page=1&is_deleted=false`,
   );
-}
-
-function assertDashboardHostnameAvailable(hostname: string | null): void {
-  if (
-    hostname &&
-    getDb().prepare("SELECT 1 FROM application_domains WHERE hostname = ?").get(hostname)
-  ) {
-    throw new HttpError(
-      409,
-      "The dashboard hostname is already assigned to an application",
-      "domain_already_assigned",
-    );
-  }
+  await cfRequestWithToken(
+    apiToken,
+    `/zones?account.id=${encodeURIComponent(accountId)}&per_page=1`,
+  );
 }
 
 function restoreCloudflareConfig(row: CloudflareRow | null): void {
@@ -541,24 +502,19 @@ function restoreCloudflareConfig(row: CloudflareRow | null): void {
   getDb()
     .prepare(
       `UPDATE cloudflare_config SET
-        account_id = ?, zone_id = ?, api_token_encrypted = ?, tunnel_id = ?,
+        account_id = ?, api_token_encrypted = ?, tunnel_id = ?,
         tunnel_name = ?, tunnel_token_encrypted = ?, dashboard_hostname = ?,
-        enabled = ?, auth_method = ?, oauth_refresh_token_encrypted = ?,
-        oauth_access_token_expires_at = ?, created_at = ?, updated_at = ?
+        enabled = ?, created_at = ?, updated_at = ?
        WHERE singleton = 1`,
     )
     .run(
       row.account_id,
-      row.zone_id,
       row.api_token_encrypted,
       row.tunnel_id,
       row.tunnel_name,
       row.tunnel_token_encrypted,
       row.dashboard_hostname,
       row.enabled,
-      row.auth_method,
-      row.oauth_refresh_token_encrypted,
-      row.oauth_access_token_expires_at,
       row.created_at,
       row.updated_at,
     );
@@ -577,49 +533,81 @@ async function cleanupCandidateTunnel(row: CloudflareRow): Promise<void> {
   );
 }
 
-async function ensureDnsRecord(
-  row: CloudflareRow,
-  hostname: string,
-  required: boolean,
-): Promise<string | null> {
+async function ensureDnsRecord(row: CloudflareRow, hostname: string): Promise<string | null> {
   if (!row.tunnel_id) return null;
-  const zoneId = await zoneForHostname(row, hostname);
-  if (!zoneId) {
-    if (required) {
-      throw new HttpError(
-        400,
-        `Cloudflare cannot manage DNS for ${hostname}; grant this token access to that zone`,
-        "cloudflare_zone_not_found",
-      );
-    }
-    logger.info("Skipping externally managed application domain during Cloudflare sync", {
+  const zone = await ensureDomainZone({
+    accountId: row.account_id,
+    apiToken: decryptSecret(row.api_token_encrypted),
+    hostname,
+  });
+  if (!zone.active) {
+    logger.info("Waiting for Cloudflare nameserver delegation", {
       hostname,
+      apex: zone.apex,
     });
     return null;
   }
-  const query = await cfRequest<Array<{ id: string; content: string }>>(
+  const zoneId = zone.zoneId;
+  const query = await cfRequest<CloudflareDnsRecord[]>(
     row,
-    `/zones/${zoneId}/dns_records?type=CNAME&name=${encodeURIComponent(hostname)}`,
+    `/zones/${zoneId}/dns_records?name=${encodeURIComponent(hostname)}`,
   );
+  const expectedContent = `${row.tunnel_id}.cfargotunnel.com`;
+  const assignment = domainAssignment(hostname);
+  const ownershipComment = domainOwnershipComment(hostname);
+  const recognizedTargets = new Set([expectedContent]);
+  if (assignment?.tunnel_id) recognizedTargets.add(`${assignment.tunnel_id}.cfargotunnel.com`);
+  const ownedRecord = query.find(
+    (record) =>
+      record.type === "CNAME" &&
+      recognizedTargets.has(record.content) &&
+      (record.comment === ownershipComment ||
+        (record.content === expectedContent && ownsDomainComment(record.comment, hostname))),
+  );
+  const conflictingRecord = query.find(
+    (record) => ["A", "AAAA", "CNAME"].includes(record.type) && record.id !== ownedRecord?.id,
+  );
+  if (conflictingRecord) {
+    const message = `DNS for ${hostname} is already in use by a record not owned by this Nix Ship instance`;
+    updateDomainAssignment(hostname, {
+      state: "conflict",
+      zoneId,
+      dnsRecordId: null,
+      tunnelId: row.tunnel_id,
+      lastError: message,
+    });
+    throw new HttpError(409, message, "domain_dns_conflict");
+  }
   const data = {
     type: "CNAME",
     name: hostname,
-    content: `${row.tunnel_id}.cfargotunnel.com`,
+    content: expectedContent,
     proxied: true,
     ttl: 1,
-    comment: "Managed by Nix Ship",
+    comment: ownershipComment,
   };
-  if (query[0]) {
-    await cfRequest(row, `/zones/${zoneId}/dns_records/${query[0].id}`, {
+  let dnsRecordId: string;
+  if (ownedRecord) {
+    await cfRequest(row, `/zones/${zoneId}/dns_records/${ownedRecord.id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
+    dnsRecordId = ownedRecord.id;
   } else {
-    await cfRequest(row, `/zones/${zoneId}/dns_records`, {
+    const created = await cfRequest<{ id: string }>(row, `/zones/${zoneId}/dns_records`, {
       method: "POST",
       body: JSON.stringify(data),
     });
+    dnsRecordId = created.id;
   }
+  updateDomainAssignment(hostname, {
+    state: "active",
+    zoneId,
+    dnsRecordId,
+    tunnelId: row.tunnel_id,
+    lastError: null,
+    verifiedAt: nowIso(),
+  });
   return zoneId;
 }
 
@@ -628,41 +616,17 @@ async function syncDomainRoute(
   domain: { hostname: string; app_id: string },
 ): Promise<string | null> {
   try {
-    const zoneId = await ensureDnsRecord(row, domain.hostname, false);
-    recordDomainStatus(domain.hostname, domain.app_id, zoneId ? "managed" : "external", zoneId);
-    return zoneId;
+    return await ensureDnsRecord(row, domain.hostname);
   } catch (error) {
-    recordDomainStatus(
-      domain.hostname,
-      domain.app_id,
-      "error",
-      null,
-      error instanceof Error ? error.message : String(error),
-    );
+    const assignment = domainAssignment(domain.hostname);
+    if (assignment?.state !== "conflict") {
+      updateDomainAssignment(domain.hostname, {
+        state: "error",
+        lastError: error instanceof Error ? error.message : String(error),
+      });
+    }
     throw error;
   }
-}
-
-function recordDomainStatus(
-  hostname: string,
-  appId: string,
-  status: "managed" | "external" | "error",
-  zoneId: string | null,
-  lastError: string | null = null,
-): void {
-  getDb()
-    .prepare(
-      `INSERT INTO cloudflare_domain_status(
-        hostname, app_id, status, zone_id, last_error, last_synced_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(hostname) DO UPDATE SET
-        app_id = excluded.app_id,
-        status = excluded.status,
-        zone_id = excluded.zone_id,
-        last_error = excluded.last_error,
-        last_synced_at = excluded.last_synced_at`,
-    )
-    .run(hostname, appId, status, zoneId, lastError, nowIso());
 }
 
 async function cleanupRemovedDomainRoutes(
@@ -670,28 +634,46 @@ async function cleanupRemovedDomainRoutes(
   activeHostnames: Set<string>,
 ): Promise<void> {
   const stale = getDb()
-    .prepare("SELECT hostname, status FROM cloudflare_domain_status ORDER BY hostname")
-    .all() as Array<{ hostname: string; status: "managed" | "external" | "error" }>;
-  for (const route of stale) {
-    if (activeHostnames.has(route.hostname)) continue;
-    if (route.status === "managed") await deleteManagedDnsRecord(row, route.hostname);
-    getDb().prepare("DELETE FROM cloudflare_domain_status WHERE hostname = ?").run(route.hostname);
+    .prepare(
+      `SELECT hostname, zone_id, tunnel_id
+       FROM domain_assignments
+       WHERE target_type = 'application' AND state = 'removing'
+       ORDER BY hostname`,
+    )
+    .all() as Array<{ hostname: string; zone_id: string | null; tunnel_id: string | null }>;
+  for (const assignment of stale) {
+    if (activeHostnames.has(assignment.hostname)) continue;
+    await deleteManagedDnsRecord(row, assignment.hostname, {
+      zoneId: assignment.zone_id,
+      tunnelId: assignment.tunnel_id,
+    });
+    getDb()
+      .prepare(
+        "DELETE FROM domain_assignments WHERE hostname = ? AND target_type = 'application' AND state = 'removing'",
+      )
+      .run(assignment.hostname);
   }
 }
 
-async function deleteManagedDnsRecord(row: CloudflareRow, hostname: string): Promise<void> {
-  if (!row.tunnel_id || !hostname) return;
-  const zoneId = await zoneForHostname(row, hostname);
+async function deleteManagedDnsRecord(
+  row: CloudflareRow,
+  hostname: string,
+  options: { zoneId?: string | null; tunnelId?: string | null } = {},
+): Promise<void> {
+  const tunnelId = options.tunnelId ?? row.tunnel_id;
+  if (!tunnelId || !hostname) return;
+  const zoneId = options.zoneId ?? (await zoneForHostname(row, hostname));
   if (!zoneId) return;
-  const records = await cfRequest<Array<{ id: string; content: string; comment?: string | null }>>(
+  const records = await cfRequest<CloudflareDnsRecord[]>(
     row,
-    `/zones/${zoneId}/dns_records?type=CNAME&name=${encodeURIComponent(hostname)}`,
+    `/zones/${zoneId}/dns_records?name=${encodeURIComponent(hostname)}`,
   );
-  const expectedContent = `${row.tunnel_id}.cfargotunnel.com`;
+  const expectedContent = `${tunnelId}.cfargotunnel.com`;
   for (const record of records) {
     if (
+      record.type !== "CNAME" ||
       record.content !== expectedContent ||
-      !["Managed by Nix Ship", "Managed by Nix Ship"].includes(record.comment ?? "")
+      !ownsDomainComment(record.comment, hostname)
     ) {
       continue;
     }
@@ -699,12 +681,14 @@ async function deleteManagedDnsRecord(row: CloudflareRow, hostname: string): Pro
   }
 }
 
-async function zoneForHostname(row: CloudflareRow, hostname: string): Promise<string | null> {
-  const configured = await cfRequest<{ id: string; name: string }>(row, `/zones/${row.zone_id}`);
-  if (hostname === configured.name || hostname.endsWith(`.${configured.name}`)) {
-    return configured.id;
-  }
+interface CloudflareDnsRecord {
+  id: string;
+  type: string;
+  content: string;
+  comment?: string | null;
+}
 
+async function zoneForHostname(row: CloudflareRow, hostname: string): Promise<string | null> {
   const labels = hostname.split(".");
   for (let index = 0; index <= labels.length - 2; index++) {
     const candidate = labels.slice(index).join(".");

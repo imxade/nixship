@@ -41,14 +41,14 @@
 ## ADR-007 — Optional Cloudflare, LAN first
 
 **Decision:** Start with authenticated LAN access. Cloudflare is connected later
-through a distributor-configured public OAuth client using Authorization Code
-with PKCE, with manual API tokens retained as a fallback. Public routes use
+with an operator-created, least-privilege API token. Public routes use
 operator-owned domains on persistent named tunnels.
 
-**Reason:** Initial use must not require a public account or domain. OAuth avoids
-asking end users to construct long-lived API tokens, while named tunnels provide
-stable DNS, SSE and availability. The same localhost origins can later be
-exposed through outbound tunnels without inventing a default Nix Ship domain.
+**Reason:** Initial use must not require a public account or domain. An API token
+avoids a distributor callback relay and can be restricted to zone and tunnel
+operations, while named tunnels provide stable DNS, SSE and availability. The
+same localhost origins can later be exposed through outbound tunnels without
+inventing a default Nix Ship domain.
 
 ## ADR-008 — No security claim between applications
 
@@ -77,3 +77,20 @@ exposed through outbound tunnels without inventing a default Nix Ship domain.
 **Reason:** Harbur owns repository authorization and Drive layout, while Nix Ship owns deployment verification and promotion. A narrow HTTP contract avoids duplicated Drive permission logic and lets a merge identify the exact content-addressed revision that is deployed.
 
 **Consequence:** Harbur snapshots are size/digest verified and safely extracted before ordinary flake evaluation. Private/LAN instance access requires explicit owner configuration; workloads remain trusted and are not isolated.
+
+## ADR-012 — Hostnames are independent, exclusive resources
+
+**Decision:** Treat each normalized apex or subdomain as an independent assignment
+owned by exactly one application or the dashboard. Keep assignment ownership in a
+shared database registry, attach an instance marker to managed DNS records and
+serialize named-tunnel configuration writes.
+
+**Reason:** Assigning an apex must not implicitly reserve its children, while the same
+exact hostname must never route to two local targets. DNS records may already serve
+systems such as Vercel, so record existence alone is not proof that Nix Ship may
+replace or delete them.
+
+**Consequence:** A conflicting local assignment returns a conflict before DNS work.
+An existing A, AAAA or CNAME without Nix Ship's matching tunnel target and ownership
+marker is reported as a DNS conflict and remains unchanged. This registry and the
+persistent named tunnel remain separate from Quick Tunnel state and processes.

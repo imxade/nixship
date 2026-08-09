@@ -12,10 +12,6 @@ PLATFORM_MASTER_KEY=<base64 32-byte key, recommended>
 PLATFORM_PUBLIC_URL=<optional stable HTTPS origin>
 QUICK_TUNNELS_ENABLED=true
 QUICK_TUNNEL_RECONCILE_SECONDS=10
-CLOUDFLARE_OAUTH_ENABLED=false
-CLOUDFLARE_OAUTH_CLIENT_ID=<optional public OAuth client ID>
-CLOUDFLARE_OAUTH_REDIRECT_URI=<exact registered callback URI>
-CLOUDFLARE_OAUTH_SCOPES=<exact space-delimited client scopes>
 BUILD_CONCURRENCY=1
 SOURCE_POLL_SECONDS=60
 METRICS_INTERVAL_SECONDS=5
@@ -23,18 +19,9 @@ MIN_FREE_DISK_MB=1024
 MIN_FREE_MEMORY_MB=256
 ```
 
-The Cloudflare client must be registered as a public Authorization Code client
-with PKCE and token endpoint authentication method `none`. Never ship a
-Cloudflare OAuth client secret in this repository or the future APK. The
-redirect URI must resolve back to
-`/api/cloudflare/oauth/callback`; a loopback URI is suitable only when the
-browser and Nix Ship run on the same device.
-
-OAuth is an optional provider module and defaults off. Turn it on only after its
-client and callback have been independently tested. A single
-`CLOUDFLARE_OAUTH_ENABLED=false` disconnects authorization and refresh
-without changing account-free Quick Tunnels, manual-token named tunnels, LAN
-routing, application deployment, or GitHub integration.
+Persistent Cloudflare integration is configured from the authenticated dashboard
+with a restricted API token. The token is encrypted in SQLite and is not an
+environment variable. Quick Tunnels do not use or depend on this token.
 
 ## First-run claim
 
@@ -129,8 +116,8 @@ production origin checks.
 - Interrupted builds are marked interrupted rather than assumed successful.
 - If SQLite integrity fails, stop the service and restore a verified backup; do not delete the database blindly.
 - If the encryption key is lost, encrypted GitHub/Cloudflare/application secrets cannot be recovered.
-- If Cloudflare OAuth authorization is revoked or its refresh token expires,
-  reconnect from the Cloudflare page. Existing LAN routes continue operating.
+- If the Cloudflare API token is revoked or expires, replace it from the
+  Cloudflare page. Existing LAN routes continue operating.
 
 ## Log retention
 

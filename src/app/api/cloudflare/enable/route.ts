@@ -15,6 +15,6 @@ export async function POST(request: NextRequest) {
     const runtime = await getRuntime();
     await runtime.cloudflare.enable();
     audit({ userId: user.id, ip: clientIp(request), action: "cloudflare.enabled" });
-    return runtime.cloudflare.status(user.id);
+    return runtime.cloudflare.status();
   });
 }

@@ -6,6 +6,7 @@ import {
   environmentKeys,
   getApplication,
   listDeployments,
+  replaceApplicationDomains,
   updateApplication,
 } from "@/server/app-service";
 import { requireRole } from "@/server/auth";
@@ -93,6 +94,8 @@ export async function DELETE(request: NextRequest, context: Context) {
     const runtimeInstance = await getRuntime();
     await runtimeInstance.stopApplication(id);
     await runtimeInstance.quickTunnels.removeApplication(id);
+    replaceApplicationDomains(id, []);
+    await runtimeInstance.cloudflare.syncIngress();
     deleteApplication(id);
     await runtimeInstance.proxy.reconcile();
     await runtimeInstance.cloudflare.syncIngress();

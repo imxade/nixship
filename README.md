@@ -19,7 +19,7 @@ optionally exposes it through Cloudflare Tunnel.
 - **Release retention and promotion** — retain a global number of active releases
   per project, preview each independently, and point a configured production
   domain at any healthy retained release without rebuilding it.
-- **Persistent named tunnels** — optional Cloudflare OAuth or manual API token
+- **Persistent named tunnels** — optional restricted Cloudflare API-token
   connection for custom domains, DNS management and multi-zone support.
 - **Encrypted secrets** — environment variables are encrypted at rest and never
   returned by APIs. Paste directly from a `.env` file.
