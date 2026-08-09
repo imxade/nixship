@@ -341,12 +341,8 @@ function TokenConnectionForm({
 }) {
   return (
     <form method="post" onSubmit={onSubmit} className="mt-3 grid gap-3">
-      <p className="text-sm text-base-content/65">
-        Required permissions: Tunnel edit, Zone read/edit, and DNS edit. Restrict the token to the
-        account this node will manage.
-      </p>
       <label className="form-control">
-        <span className="label-text mb-1">Account ID</span>
+        <span className="label-text mb-1">Cloudflare account ID</span>
         <input
           required
           name="accountId"
@@ -354,6 +350,48 @@ function TokenConnectionForm({
           className="input input-bordered font-mono"
         />
       </label>
+      <div className="rounded-box border border-base-300 bg-base-200/50 p-4 text-sm">
+        <h3 className="font-semibold text-base-content">Create a restricted API token in Cloudflare</h3>
+        <p className="mt-1 text-xs text-base-content/70">
+          Go to your Cloudflare Dashboard under <strong>Profile &gt; API Tokens</strong> and create a custom token with these permissions:
+        </p>
+        <div className="mt-2 overflow-x-auto">
+          <table className="table table-xs">
+            <thead>
+              <tr className="text-base-content/60">
+                <th>Resource</th>
+                <th>Permission</th>
+                <th>Scope</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-xs">
+              <tr>
+                <td>Account</td>
+                <td>Cloudflare Tunnel / Connector</td>
+                <td>Edit</td>
+              </tr>
+              <tr>
+                <td>Zone</td>
+                <td>Zone</td>
+                <td>Read</td>
+              </tr>
+              <tr>
+                <td>Zone</td>
+                <td>Zone</td>
+                <td>Edit</td>
+              </tr>
+              <tr>
+                <td>Zone</td>
+                <td>DNS</td>
+                <td>Edit</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-base-content/60">
+          Restrict the Account permission to your specific account. Zone permissions must cover all zones in that account. Global API keys and OAuth are not supported.
+        </p>
+      </div>
       <label className="form-control">
         <span className="label-text mb-1">API token</span>
         <input required name="apiToken" type="password" className="input input-bordered" />

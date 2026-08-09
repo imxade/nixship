@@ -392,7 +392,7 @@ EMPTY=
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/integrations/cloudflare");
   await expect(page.getByRole("button", { name: "Connect Cloudflare" })).toBeVisible();
-  await page.getByLabel("Account ID").fill("a".repeat(32));
+  await page.getByLabel("Cloudflare account ID").fill("a".repeat(32));
   await page.getByLabel("API token").fill("restricted-cloudflare-token");
   await page.getByLabel("Dashboard hostname (optional)").fill("console.example.com");
   await page.getByRole("button", { name: "Connect Cloudflare" }).click();
