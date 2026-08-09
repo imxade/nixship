@@ -10,7 +10,7 @@
 
 ## ADR-002 — Nix flakes are the only deployment definition
 
-**Decision:** Require `flake.nix`, `flake.lock`, and a runnable flake app output. A project can isolate production packaging in `live.nix`, imported by the flake, but Nix Ship never evaluates that loose file directly. Do not add dashboard-defined build/start shell commands.
+**Decision:** Require `flake.nix`, `flake.lock`, and a runnable flake app output. Nix Ship evaluates and runs only locked flake outputs. Do not add dashboard-defined build/start shell commands.
 
 **Reason:** This keeps the application package reproducible and prevents the control plane from becoming an unrestricted remote shell interface.
 

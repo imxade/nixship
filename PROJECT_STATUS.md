@@ -61,7 +61,7 @@ Last updated: 2026-08-09.
 - File-backed live logs with bounded active/inactive retention.
 - Verified, checksummed SQLite/application-data backup and rollback-safe restore commands.
 - Locked pnpm and Nix inputs, reproducible Nix dependency hash, CI security/audit/license gates and packaged operational commands.
-- A separate production `live.nix` package definition behind the locked flake contract, plus directly deployed `hello-flake` and npm-start examples.
+- A flake-backed production package plus directly deployed `hello-flake` and npm-start examples.
 - A reproducible Android controller shell with Maestro/ADB/Java plus guarded
   Nix-on-Droid and Maestro acceptance scripts and a manually dispatched
   physical-runner workflow that retains evidence. First-run Maestro automation

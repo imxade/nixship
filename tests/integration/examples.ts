@@ -105,7 +105,9 @@ function createExampleRepository(name: string): string {
   })
     .trim()
     .split("\n")
-    .filter(Boolean);
+    .filter((trackedFile) =>
+      trackedFile ? fs.existsSync(path.join(process.cwd(), trackedFile)) : false,
+    );
   assert.ok(trackedFiles.length > 0, `No tracked files found for ${name}`);
   for (const trackedFile of trackedFiles) {
     const relative = trackedFile.slice(sourcePrefix.length);

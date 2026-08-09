@@ -14,9 +14,8 @@ immutable ZIP whose revision and compressed content are the same SHA-256 digest.
 produce this locked flake layout before evaluation.
 
 The flake is the locked, standard Nix entry point rather than a development-only
-file. To keep concerns separate, a repository may put its production package in
-`live.nix` and import it from `flake.nix`. Nix Ship evaluates only the flake
-output; it never executes a loose Nix file or dashboard-provided command.
+file. Nix Ship evaluates only the flake output; it never executes a loose Nix
+file or dashboard-provided command.
 
 ## Required output
 
