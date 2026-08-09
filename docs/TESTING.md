@@ -11,6 +11,7 @@ pnpm test:e2e
 pnpm test:deployment
 pnpm test:examples
 pnpm test:github-public             # opt-in external push test
+pnpm test:harbur-private            # secret-backed external deployment test
 pnpm db:doctor
 pnpm security:check
 pnpm audit --prod --audit-level high
@@ -21,7 +22,8 @@ nix build
 
 The current push/pull-request CI runs the application, browser, database,
 security, audit, license, direct-example, real-deployment and Nix package gates
-on x86_64 Linux.
+on x86_64 Linux. Trusted pushes to `master` additionally run the private Harbur
+deployment test. Pull requests never receive its integration token.
 
 Release CI expansion still required:
 
@@ -94,6 +96,22 @@ the health endpoint at the same URL before and after deployment. The probe allow
 for Cloudflare's initial DNS warm-up and can verify the edge through public DNS
 when the test host's resolver has negatively cached the newly assigned hostname.
 It must never be pointed at a repository whose history should remain untouched.
+
+`pnpm test:harbur-private` is a read-only external acceptance test. It requires
+`HARBUR_INTEGRATION_READ_TOKEN` and defaults to the private `rb/kitsy` repository
+on `https://harbur.vercel.app`; `HARBUR_TEST_BASE_URL` and
+`HARBUR_TEST_REPOSITORY_ID` can select a dedicated equivalent. The test connects
+through the same encrypted-token service used by the dashboard, discovers the
+private repository, matches its latest immutable revision with the durable event
+feed, downloads and verifies the bounded snapshot, runs its real locked flake,
+checks the stable application proxy, and verifies that event replay did not queue
+the same revision twice. It uses an isolated data directory, disables Quick
+Tunnels, stops the workload, and removes the temporary state afterward. The
+master-only CI job receives the token only for this step and uploads no artifact.
+The harness removes the token variable from the process environment before the
+workload starts, so the deployed application cannot inherit it. The repository
+remains a trusted workload: this test evaluates and executes its flake on the
+runner.
 
 The 2026-07-26 acceptance run used the public
 `imxade/platform-deployment-test` fixture whose default branch is `trunk`. Normal

@@ -69,6 +69,8 @@ Last updated: 2026-08-09.
 - Responsive dashboard coverage across phone, tablet and desktop viewports.
 - Opt-in public-GitHub acceptance automation that pushes a real commit and
   proves exact-commit healthy redeployment through the stable proxy.
+- Master-only private-Harbur acceptance automation that keeps its read token out
+  of pull requests and deploys a real immutable snapshot without retained artifacts.
 - Apache-2.0 licensing with Rituraj Basak recorded as the owner.
 
 ## Validation completed on x86_64 Linux
@@ -245,6 +247,16 @@ background polling loop detect it. The exact revision activated after 10 seconds
 superseded the previous release and remained healthy through the stable proxy and
 the unchanged application Quick URL
 `https://path-babies-function-biotechnology.trycloudflare.com`.
+
+The live private Harbur acceptance test connected to
+`https://harbur.vercel.app`, discovered `rb/kitsy` only with the encrypted
+integration token, matched its durable event to immutable SHA-256 revision
+`6037a0c661e5dbe877cf9bba038c56c93db05f0911bff8c61f07a62ed5a9823a`,
+verified and extracted the 297,063-byte snapshot, built its locked flake,
+activated Kitsy, and received HTTP 200 through the stable application proxy.
+The background event reconciler advanced its cursor without queuing the exact
+revision twice. A secret-backed master-only CI job now repeats this read-only
+gate; pull-request jobs do not receive the token and the gate uploads no artifact.
 
 The Android development shell evaluated for `x86_64-linux`, `aarch64-linux`,
 and `aarch64-darwin`. Its Maestro 2.6.1 CI login flow passed on an Android 15

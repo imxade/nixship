@@ -35,6 +35,7 @@
     "test:deployment": "tsx tests/integration/deployment.ts",
     "test:examples": "tsx tests/integration/examples.ts",
     "test:github-public": "tsx tests/integration/public-github.ts",
+    "test:harbur-private": "tsx tests/integration/harbur-private.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm biome:ci && pnpm typecheck && pnpm test && pnpm build",
