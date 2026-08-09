@@ -67,8 +67,8 @@ export function DashboardShell({
                     href={href}
                     className={
                       pathname === href ||
-                        (href !== "/apps" && pathname.startsWith(href)) ||
-                        (href === "/apps" && pathname.startsWith("/apps"))
+                      (href !== "/apps" && pathname.startsWith(href)) ||
+                      (href === "/apps" && pathname.startsWith("/apps"))
                         ? "active"
                         : ""
                     }

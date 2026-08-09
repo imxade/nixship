@@ -397,7 +397,7 @@ EMPTY=
   await page.getByLabel("Dashboard hostname (optional)").fill("console.example.com");
   await page.getByRole("button", { name: "Connect Cloudflare" }).click();
   await expect(page.getByRole("heading", { name: "Persistent tunnel" })).toBeVisible();
-  await expect(page.getByText("Restricted API token")).toBeVisible();
+  await expect(page.getByText("Restricted API token", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Dashboard hostname (optional)")).toHaveValue("console.example.com");
   const cloudflareDimensions = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
