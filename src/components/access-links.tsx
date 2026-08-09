@@ -42,7 +42,7 @@ export function AccessLinks({
           key={`${link.kind}:${link.url || link.label}`}
           className={
             compact
-              ? "flex min-w-0 max-w-full items-center gap-2"
+              ? "flex min-w-0 max-w-full items-start gap-2"
               : "rounded-box min-w-0 max-w-full overflow-hidden border border-base-300 bg-base-100 p-3"
           }
         >
@@ -50,7 +50,11 @@ export function AccessLinks({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">{link.label}</span>
               {link.status !== "available" && (
-                <span className={`badge badge-sm ${statusClass(link.status)}`}>{link.status}</span>
+                <span
+                  className={`badge min-h-6 max-w-full whitespace-normal break-words px-2 py-1 text-left text-xs leading-tight font-medium ${statusClass(link.status)}`}
+                >
+                  {link.status}
+                </span>
               )}
             </div>
             {link.status === "available" ? (

@@ -18,5 +18,11 @@ const presentation = {
 
 export function DomainRouteStatusBadge({ status }: { status: DomainRoute["status"] }) {
   const value = presentation[status];
-  return <span className={`badge badge-sm ${value.className}`}>{value.label}</span>;
+  return (
+    <span
+      className={`badge ${value.className} min-h-6 max-w-full whitespace-normal break-words px-2 py-1 text-left text-xs leading-tight font-medium`}
+    >
+      {value.label}
+    </span>
+  );
 }

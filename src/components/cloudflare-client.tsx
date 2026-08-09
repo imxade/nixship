@@ -351,9 +351,12 @@ function TokenConnectionForm({
         />
       </label>
       <div className="rounded-box border border-base-300 bg-base-200/50 p-4 text-sm">
-        <h3 className="font-semibold text-base-content">Create a restricted API token in Cloudflare</h3>
+        <h3 className="font-semibold text-base-content">
+          Create a restricted API token in Cloudflare
+        </h3>
         <p className="mt-1 text-xs text-base-content/70">
-          Go to your Cloudflare Dashboard under <strong>Profile &gt; API Tokens</strong> and create a custom token with these permissions:
+          Go to your Cloudflare Dashboard under <strong>Profile &gt; API Tokens</strong> and create
+          a custom token with these permissions:
         </p>
         <div className="mt-2 overflow-x-auto">
           <table className="table table-xs">
@@ -389,7 +392,8 @@ function TokenConnectionForm({
           </table>
         </div>
         <p className="mt-2 text-xs text-base-content/60">
-          Restrict the Account permission to your specific account. Zone permissions must cover all zones in that account. Global API keys and OAuth are not supported.
+          Restrict the Account permission to your specific account. Zone permissions must cover all
+          zones in that account. Global API keys and OAuth are not supported.
         </p>
       </div>
       <label className="form-control">
@@ -528,7 +532,7 @@ function DomainRoutes({ status }: { status: Status | null }) {
             Manage applications
           </Link>
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto rounded-box border border-base-300">
           <table className="table">
             <thead>
               <tr>
@@ -547,11 +551,15 @@ function DomainRoutes({ status }: { status: Status | null }) {
                       {route.appName}
                     </Link>
                   </td>
-                  <td className="font-mono">{route.hostname}</td>
-                  <td>
-                    <DomainRouteStatusBadge status={route.status} />
+                  <td className="max-w-72 break-all font-mono">{route.hostname}</td>
+                  <td className="min-w-48">
+                    <div className="max-w-56">
+                      <DomainRouteStatusBadge status={route.status} />
+                    </div>
                     {route.lastError && (
-                      <div className="mt-1 max-w-md text-xs text-error">{route.lastError}</div>
+                      <div className="mt-1 max-w-md break-words text-xs text-error">
+                        {route.lastError}
+                      </div>
                     )}
                   </td>
                   <td className="font-mono">127.0.0.1:{route.publicPort}</td>

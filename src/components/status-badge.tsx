@@ -1,4 +1,4 @@
-export function StatusBadge({ state }: { state: string }) {
+export function StatusBadge({ state, className = "" }: { state: string; className?: string }) {
   const positive = ["running", "processed", "active", "connected"].includes(state);
   const pending = [
     "queued",
@@ -18,5 +18,11 @@ export function StatusBadge({ state }: { state: string }) {
         ? "badge-ghost"
         : "badge-error";
   const label = state.replaceAll("-", " ");
-  return <span className={`badge ${cls} badge-sm font-medium`}>{label}</span>;
+  return (
+    <span
+      className={`badge ${cls} min-h-6 max-w-full whitespace-normal break-words px-2 py-1 text-left text-xs leading-tight font-medium ${className}`}
+    >
+      {label}
+    </span>
+  );
 }
