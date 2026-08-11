@@ -28,6 +28,9 @@ describe("database migrations", () => {
     apply(db, migration("011_cloudflare_api_token_only.sql"));
     apply(db, migration("012_domain_zones.sql"));
     apply(db, migration("013_drop_cloudflare_domain_status.sql"));
+    apply(db, migration("014_ai_control_plane.sql"));
+    apply(db, migration("015_ai_reauthentication.sql"));
+    apply(db, migration("016_ai_conversation_models.sql"));
 
     expect(
       db
@@ -109,6 +112,29 @@ describe("database migrations", () => {
         .columns()
         .map((column) => column.name),
     ).toContain("observed_records");
+    expect(
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_plans'").get(),
+    ).toEqual({ name: "ai_plans" });
+    expect(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'ai_run_steps_idempotency_idx'",
+        )
+        .get(),
+    ).toBeUndefined();
+    expect(db.prepare("SELECT idempotency_key FROM ai_plan_run_steps").columns()[0]?.name).toBe(
+      "idempotency_key",
+    );
+    expect(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_reauth_grants'",
+        )
+        .get(),
+    ).toEqual({ name: "ai_reauth_grants" });
+    expect(db.prepare("SELECT model_profile_id FROM ai_conversations").columns()[0]?.name).toBe(
+      "model_profile_id",
+    );
     expect(db.pragma("foreign_key_check")).toEqual([]);
     db.close();
   });
@@ -141,6 +167,8 @@ describe("database migrations", () => {
     apply(db, migration("011_cloudflare_api_token_only.sql"));
     apply(db, migration("012_domain_zones.sql"));
     apply(db, migration("013_drop_cloudflare_domain_status.sql"));
+    apply(db, migration("014_ai_control_plane.sql"));
+    apply(db, migration("015_ai_reauthentication.sql"));
 
     expect(db.prepare("SELECT hostname, app_id FROM application_domains").all()).toEqual([
       { hostname: "app.example.com", app_id: "app-1" },

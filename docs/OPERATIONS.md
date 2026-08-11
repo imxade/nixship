@@ -17,11 +17,78 @@ SOURCE_POLL_SECONDS=60
 METRICS_INTERVAL_SECONDS=5
 MIN_FREE_DISK_MB=1024
 MIN_FREE_MEMORY_MB=256
+PLATFORM_AI_BASE_URL=<optional OpenAI-compatible /v1 base URL>
+PLATFORM_AI_MODEL=<model ID>
+PLATFORM_AI_API_KEY=<optional provider key>
+PLATFORM_AI_ALLOW_PRIVATE_NETWORK=false
+PLATFORM_AI_TIMEOUT_SECONDS=60
 ```
 
 Persistent Cloudflare integration is configured from the authenticated dashboard
 with a restricted API token. The token is encrypted in SQLite and is not an
 environment variable. Quick Tunnels do not use or depend on this token.
+
+## Optional AI assistant
+
+AI is idle unless a persisted provider/model profile or both `PLATFORM_AI_BASE_URL`
+and `PLATFORM_AI_MODEL` are configured. Remote endpoints require HTTPS. To use an explicitly
+trusted local OpenAI-compatible endpoint such as Ollama, set:
+
+```bash
+PLATFORM_AI_BASE_URL=http://127.0.0.1:11434/v1
+PLATFORM_AI_MODEL=<installed exact tag>
+PLATFORM_AI_ALLOW_PRIVATE_NETWORK=true
+```
+
+Keep external runtimes loopback-only. `PLATFORM_AI_API_KEY`
+remains server-side and is sent only as the provider Authorization header. Normal
+dashboard administration remains available when the model is absent or unhealthy.
+
+Owners/admins can configure OpenAI-compatible providers through masked secure
+input. Provider keys are encrypted and never returned. Conversation and planner
+defaults are separate; only probe-qualified profiles can plan actions.
+
+Run the opt-in compatibility probe against a small local model with:
+
+```bash
+AI_LOCAL_TEST_BASE_URL=http://127.0.0.1:11434/v1 \
+AI_LOCAL_TEST_MODEL=<installed exact tag> \
+pnpm test:ai-local
+```
+
+The harness checks a factual answer and then runs the same versioned action-planner
+probe enforced by the server: strict nested read-tool input and enums, exact tool
+result use, capability search, exact capability/version planning, absence of invented
+mutation tools, opaque-secret handling and completion within the six-step budget. It
+reports each check independently and exits non-zero on any failure.
+
+### Flake-pinned Ollama development shell
+
+The optional AI development shell supplies the Ollama binary from the exact
+`nixpkgs` revision in `flake.lock` without adding it to the normal Nix Ship package:
+
+```bash
+nix develop .#ai
+ollama serve
+```
+
+The shell binds Ollama to `127.0.0.1:11434`, places models below
+`$PLATFORM_DATA_DIR/ai/ollama/models`, and configures the compatible API URL used by
+Nix Ship and the local-model harness. In another AI shell:
+
+```bash
+ollama pull <exact-model-tag>
+export PLATFORM_AI_MODEL=<exact-model-tag>
+export AI_LOCAL_TEST_MODEL=<exact-model-tag>
+pnpm test:ai-local
+pnpm dev
+```
+
+The production flake also exposes `packages.ollama`. Managed Ollama is absent from
+the base Nix Ship closure: approved runtime enablement realizes the pinned reference
+into a data-directory GC root and starts it on loopback. Pull/remove actions use
+normal plan approval, with real pull progress in the assistant. Disable stops the
+owned process without deleting weights.
 
 ## First-run claim
 

@@ -17,6 +17,7 @@ optionally exposes it through Cloudflare Tunnel.
 | **Persistent named tunnels** | Optional restricted Cloudflare API-token connection for custom domains, DNS management and multi-zone support. |
 | **Encrypted secrets** | Environment variables are encrypted at rest and never returned by APIs. Paste directly from a `.env` file. |
 | **Zero-downtime deploys** | The current healthy release stays routed until the candidate passes health checks. |
+| **Approval-gated AI assistant** | An optional OpenAI-compatible model can answer from live state and propose typed operations across applications, deployments, sources, Cloudflare, Harbur, settings and AI runtime management. Exact hash approval, RBAC, reauthentication, preconditions and deterministic verification remain outside the model. |
 
 
 ## Quick start
@@ -71,6 +72,55 @@ See [`docs/DEPLOYMENT_CONTRACT.md`](docs/DEPLOYMENT_CONTRACT.md) and the
 - Zod validation, Server-Sent Events
 - Biome (format + lint), Vitest, Playwright
 - Nix, Git and cloudflared as managed executables
+
+## AI assistant
+
+The dashboard includes a global AI SDK assistant drawer. It can answer questions
+through bounded read capabilities and can operate applications, deployments,
+environment metadata, GitHub/Harbur sources, Cloudflare domains, AI providers,
+model defaults, and the optional managed Ollama runtime.
+
+The model never receives mutation implementations. Changes are immutable plans
+bound to a canonical SHA-256 hash, state snapshot, capability versions and the
+authenticated human. Approval starts deterministic Nix Ship code; deployment and
+model-download progress comes from real runtime events. Sensitive/destructive
+plans require current-password re-authentication, and secure inputs become scoped,
+expiring, one-use opaque references that never enter model context.
+
+Public GitHub repositories are inspected first. Both `flake.nix` and `flake.lock`
+must be committed; otherwise the assistant provides a starter flake and exact
+lock/hash instructions instead of proposing deployment. Models must pass the
+strict tool/plan compatibility probe before planning; failures remain answer-only.
+
+Configure an OpenAI-compatible endpoint before startup:
+
+```bash
+PLATFORM_AI_BASE_URL=https://provider.example/v1
+PLATFORM_AI_MODEL=model-id
+PLATFORM_AI_API_KEY=... # optional for a trusted local endpoint
+```
+
+Private external endpoints, including operator-run Ollama on loopback, additionally require
+`PLATFORM_AI_ALLOW_PRIVATE_NETWORK=true`. Plain HTTP is accepted only for an
+explicitly enabled private endpoint. Never paste credentials into chat; use the
+masked secure-input card.
+
+For a flake-pinned local Ollama development environment, use the optional AI shell:
+
+```bash
+nix develop .#ai
+ollama serve
+```
+
+In a second `nix develop .#ai` shell, pull an exact model tag, export that tag as
+both `PLATFORM_AI_MODEL` and `AI_LOCAL_TEST_MODEL`, then run `pnpm test:ai-local`.
+The AI shell sets the loopback endpoint, private-network opt-in and a repository-local
+Ollama model directory. Ollama remains outside the base production closure; managed
+Ollama is realized and started only by an approved plan.
+
+See [`SPECIFICATION.md`](SPECIFICATION.md) for the normative platform requirements,
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the AI control-plane design, and
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md) for configuration and local-model probing.
 
 ## Documentation
 

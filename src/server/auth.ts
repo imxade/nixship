@@ -35,6 +35,10 @@ export interface AuthenticatedUser {
   role: Role;
 }
 
+export interface AuthenticatedActor extends AuthenticatedUser {
+  sessionId: string;
+}
+
 export function isSetupComplete(): boolean {
   const row = getDb().prepare("SELECT 1 AS present FROM users LIMIT 1").get() as
     | { present: number }
@@ -175,6 +179,11 @@ export function createSession(
 }
 
 export function authenticateSession(token: string | undefined): AuthenticatedUser | null {
+  const actor = authenticateSessionActor(token);
+  return actor ? { id: actor.id, username: actor.username, role: actor.role } : null;
+}
+
+export function authenticateSessionActor(token: string | undefined): AuthenticatedActor | null {
   if (!token) return null;
   const row = getDb()
     .prepare(
@@ -190,7 +199,7 @@ export function authenticateSession(token: string | undefined): AuthenticatedUse
   if (!Number.isFinite(lastSeen) || Date.now() - lastSeen > 5 * 60_000) {
     getDb().prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").run(nowIso(), row.id);
   }
-  return { id: row.user_id, username: row.username, role: row.role };
+  return { id: row.user_id, username: row.username, role: row.role, sessionId: row.id };
 }
 
 export function logout(token: string | undefined, ip?: string | null): void {

@@ -94,3 +94,21 @@ replace or delete them.
 An existing A, AAAA or CNAME without Nix Ship's matching tunnel target and ownership
 marker is reported as a DNS conflict and remains unchanged. This registry and the
 persistent named tunnel remain separate from Quick Tunnel state and processes.
+
+## ADR-013 — AI proposes; the control plane authorizes and mutates
+
+**Decision:** Keep AI inside the existing TypeScript control plane as a bounded
+read-only reasoning layer. Persist canonical, hashed plans in SQLite and require
+server-side human approval before a deterministic capability executor may call a
+shared domain service. Do not expose shell, SQL, generic HTTP, filesystem writes or
+mutation functions to the planning model.
+
+**Reason:** Model output and repository/provider text are untrusted. Structural
+separation between planning and execution prevents prompt injection or a mistaken
+tool call from acquiring mutation authority.
+
+**Consequence:** Capability IDs and versions, schemas, RBAC, state snapshots,
+resource locks, audit records, idempotency keys and postcondition verification are
+Nix Ship-owned contracts. AI outages never block the ordinary dashboard. Provider
+profiles, opaque secure references, separate model roles and lazy managed Ollama
+remain implementations of this boundary rather than alternative authorities.

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { ManagedOllamaRuntime } from "./ai/runtimes/ollama.ts";
 import { applicationDomains, queueDeployment } from "./app-service.ts";
 import { audit } from "./audit.ts";
 import { ensureSetupToken, purgeExpiredSessions } from "./auth.ts";
@@ -37,6 +38,7 @@ export class PlatformRuntime {
   readonly git = new GitReconciler();
   readonly harbur = new HarburReconciler();
   readonly logRetention = new LogRetentionController();
+  readonly ollama = new ManagedOllamaRuntime();
   private maintenanceTimer: NodeJS.Timeout | null = null;
   private closed = false;
 
@@ -53,6 +55,7 @@ export class PlatformRuntime {
     this.git.boot();
     this.harbur.boot();
     this.logRetention.boot();
+    await this.ollama.boot();
     await this.cloudflare.boot();
     await this.quickTunnels.boot();
     void synchronizeGitHubWebhook().catch(() => undefined);
@@ -69,6 +72,7 @@ export class PlatformRuntime {
     this.git.close();
     this.harbur.close();
     this.logRetention.close();
+    await this.ollama.close();
     this.metrics.close();
     await this.deployments.close();
     await this.supervisor.close();

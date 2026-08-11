@@ -12,6 +12,10 @@ pnpm test:deployment
 pnpm test:examples
 pnpm test:github-public             # opt-in external push test
 pnpm test:harbur-private            # secret-backed external deployment test
+pnpm test:ai-local                  # opt-in real local OpenAI-compatible model probe
+pnpm test:ai-github                 # real Kitsy inspect/plan/approve/build/health test
+pnpm test:ai-harbur                 # real public Harbur snapshot deployment test
+pnpm test:ai-ollama                 # flake-built managed Ollama lifecycle test
 pnpm db:doctor
 pnpm security:check
 pnpm audit --prod --audit-level high
@@ -58,6 +62,42 @@ indicator, display the failure and provide a retry action.
 Cloudflare tests cover API-token validation, zone discovery, pending and managed
 DNS states, ownership-checked DNS cleanup and the responsive connection UI. A
 mocked API result is not a live Cloudflare acceptance result.
+
+AI unit tests use a deterministic fake provider and cover encrypted transcripts,
+credential rejection before provider access, read-only tool exposure, immutable
+hash approval, stale state, RBAC, strict schemas, resource-key validation,
+idempotent duplicate approval, SSRF-sensitive endpoint policy and verified rename
+execution. Core correctness never depends on a paid provider.
+
+The Playwright CI admin project uses a loopback OpenAI-compatible fixture to check
+answer-without-plan, masked secure input, action-to-immutable-plan, no mutation
+before approval, rejection and the mobile full-height drawer.
+
+`pnpm test:ai-github` uses isolated temporary state and never pushes upstream. By
+default it inspects `https://github.com/imxade/kitsy`, proves no mutation occurred
+before exact approval, performs the real Nix build/health activation under a unique
+name, and verifies the active release over local HTTP.
+
+`pnpm test:ai-harbur` approves connection and deployment as separate plans, checks
+the content-addressed snapshot and targets `rb/kitsy` by default. Because that
+repository is private, set `HARBUR_INTEGRATION_READ_TOKEN`; the harness immediately
+stores it as a scoped, one-use encrypted reference before plan validation, and never
+places plaintext in model or plan data. Override `AI_HARBUR_TEST_REPOSITORY_ID` for
+another repository. The test fails if the snapshot is missing a locked flake, if the
+workload ignores its assigned runtime address, or if health activation does not pass.
+
+`pnpm test:ai-ollama` requires `PLATFORM_OLLAMA_BIN` from `nix build .#ollama` and
+verifies lazy enable, loopback readiness, owned process identity, isolated model
+storage and clean disable.
+
+`pnpm test:ai-local` is separate evidence for an actually installed local model.
+The model runtime can be obtained reproducibly with `nix develop .#ai`; start
+`ollama serve`, pull an exact model tag, and set `AI_LOCAL_TEST_MODEL` before running
+the harness. Merely evaluating the shell or downloading a model is not a passing
+model result.
+It requires `AI_LOCAL_TEST_BASE_URL` and `AI_LOCAL_TEST_MODEL`; omitting them is a
+failure, not a skipped or fabricated pass. The test does not install weights or
+open a listening service and never grants the model a mutation tool.
 
 Quick Tunnel unit coverage validates strict `trycloudflare.com` URL discovery,
 rejects deceptive suffixes, and requires both public DNS and an edge response

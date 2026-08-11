@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { AssistantDrawer } from "./ai/assistant-drawer";
 import { BrandMark } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -94,6 +95,7 @@ export function DashboardShell({
           </div>
         </div>
       </aside>
+      <AssistantDrawer />
     </div>
   );
 }

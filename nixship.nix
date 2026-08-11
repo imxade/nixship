@@ -2,6 +2,7 @@
   pkgs,
   self,
   systems,
+  ollamaNixRef,
 }:
 let
   pnpmDeps = pkgs.fetchPnpmDeps {
@@ -9,7 +10,7 @@ let
     version = "0.1.0";
     src = self;
     pnpm = pkgs.pnpm_10;
-    hash = "sha256-5WTp0sNSyeUinYD8QmO123fXGhsIgbzV3B6NkXdFZMY=";
+    hash = "sha256-w2FMKvpBKN/NVPO0XNWMrmlTUeZ2Vd4ELcl0RzZtKv0=";
     fetcherVersion = 3;
   };
 in
@@ -18,7 +19,7 @@ pkgs.stdenv.mkDerivation {
   version = "0.1.0";
   src = self;
   nativeBuildInputs = [
-    pkgs.nodejs_22
+    pkgs.nodejs_24
     pkgs.pnpm_10
     pkgs.pnpmConfigHook
     pkgs.python3
@@ -41,27 +42,28 @@ pkgs.stdenv.mkDerivation {
     export NODE_ENV=production
     export HOSTNAME="\''${HOSTNAME:-0.0.0.0}"
     export PORT="\''${PORT:-3000}"
+    export PLATFORM_OLLAMA_NIX_REF="\''${PLATFORM_OLLAMA_NIX_REF:-${ollamaNixRef}}"
     export PATH="${pkgs.lib.makeBinPath [
       pkgs.nix
       pkgs.git
       pkgs.cloudflared
       pkgs.gnutar
     ]}:\$PATH"
-    exec ${pkgs.nodejs_22}/bin/node dist-server/server.js
+    exec ${pkgs.nodejs_24}/bin/node dist-server/server.js
     WRAPPER
     cat > $out/bin/nixship-backup <<WRAPPER
     #!${pkgs.runtimeShell}
     set -euo pipefail
     cd $out/lib/nixship
     export PATH="${pkgs.lib.makeBinPath [ pkgs.gnutar ]}:\$PATH"
-    exec ${pkgs.nodejs_22}/bin/node node_modules/tsx/dist/cli.mjs scripts/backup.ts "\$@"
+    exec ${pkgs.nodejs_24}/bin/node node_modules/tsx/dist/cli.mjs scripts/backup.ts "\$@"
     WRAPPER
     cat > $out/bin/nixship-restore <<WRAPPER
     #!${pkgs.runtimeShell}
     set -euo pipefail
     cd $out/lib/nixship
     export PATH="${pkgs.lib.makeBinPath [ pkgs.gnutar ]}:\$PATH"
-    exec ${pkgs.nodejs_22}/bin/node node_modules/tsx/dist/cli.mjs scripts/restore.ts "\$@"
+    exec ${pkgs.nodejs_24}/bin/node node_modules/tsx/dist/cli.mjs scripts/restore.ts "\$@"
     WRAPPER
     chmod +x $out/bin/nixship $out/bin/nixship-backup $out/bin/nixship-restore
     ln -s nixship-backup $out/bin/platform-backup

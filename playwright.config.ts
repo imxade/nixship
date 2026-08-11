@@ -22,7 +22,7 @@ export default defineConfig({
     },
     {
       name: "ci-admin",
-      testMatch: /ci-admin\.spec\.ts/,
+      testMatch: /(ci-admin|ai-assistant)\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${adminPort}` },
     },
     {

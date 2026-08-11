@@ -29,6 +29,13 @@ const envSchema = z.object({
   LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(7),
   LOG_MAX_MB: z.coerce.number().int().min(10).max(102400).default(1024),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  PLATFORM_AI_BASE_URL: z.string().url().optional().or(z.literal("")),
+  PLATFORM_AI_MODEL: z.string().trim().min(1).max(200).optional(),
+  PLATFORM_AI_API_KEY: z.string().max(8192).optional(),
+  PLATFORM_AI_ALLOW_PRIVATE_NETWORK: envBoolean(false),
+  PLATFORM_AI_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(300).default(60),
+  PLATFORM_OLLAMA_BIN: z.string().trim().optional().default(""),
+  PLATFORM_OLLAMA_NIX_REF: z.string().trim().optional().default(""),
 });
 
 export const config = envSchema.parse(process.env);

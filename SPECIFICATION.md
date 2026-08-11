@@ -76,6 +76,11 @@ Only trusted GitHub repositories and verified immutable Harbur snapshots are acc
     record unless its tunnel target and Nix Ship ownership marker prove that this
     instance owns it. Named-tunnel configuration writes are serialized. Persistent
     domain assignment must not start, stop, rotate, or otherwise mutate Quick Tunnels.
+27. AI-originated platform mutations must be persisted as immutable, canonicalized
+    plans and approved against their exact hash by the authenticated human actor.
+    The planning model receives read-only capabilities only; deterministic Nix Ship
+    code rechecks RBAC and resource state, executes registered typed capabilities,
+    and verifies results without another model decision.
 
 ## Android distribution tracks
 

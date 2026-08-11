@@ -21,23 +21,49 @@
             sqlite
             gnutar
           ];
-          mkNixShipShell = packages: pkgs.mkShell {
+          mkNixShipShell = {
+            packages,
+            label ? "development",
+            extraShellHook ? "",
+          }: pkgs.mkShell {
             inherit packages;
             shellHook = ''
               export PLATFORM_DATA_DIR="''${PLATFORM_DATA_DIR:-$PWD/.local-data}"
-              echo "Nix Ship development shell (${system})"
+              echo "Nix Ship ${label} shell (${system})"
               echo "Run: pnpm install && pnpm dev"
+              ${extraShellHook}
             '';
           };
         in {
-          default = mkNixShipShell basePackages;
-          android = mkNixShipShell (basePackages ++ (with pkgs; [
-            android-tools
-            curl
-            jdk21_headless
-            maestro
-            yq-go
-          ]));
+          default = mkNixShipShell { packages = basePackages; };
+          ai = mkNixShipShell {
+            label = "AI development";
+            packages = basePackages ++ (with pkgs; [
+              curl
+              ollama
+            ]);
+            extraShellHook = ''
+              export OLLAMA_HOST="''${OLLAMA_HOST:-127.0.0.1:11434}"
+              export OLLAMA_MODELS="''${OLLAMA_MODELS:-$PLATFORM_DATA_DIR/ai/ollama/models}"
+              export PLATFORM_AI_BASE_URL="''${PLATFORM_AI_BASE_URL:-http://127.0.0.1:11434/v1}"
+              export PLATFORM_AI_ALLOW_PRIVATE_NETWORK="''${PLATFORM_AI_ALLOW_PRIVATE_NETWORK:-true}"
+              export PLATFORM_OLLAMA_BIN="${pkgs.ollama}/bin/ollama"
+              export PLATFORM_OLLAMA_NIX_REF="github:NixOS/nixpkgs/${nixpkgs.rev}#ollama"
+              export AI_LOCAL_TEST_BASE_URL="''${AI_LOCAL_TEST_BASE_URL:-http://127.0.0.1:11434/v1}"
+              echo "Ollama is pinned by flake.lock and configured for 127.0.0.1:11434"
+              echo "Start it in another AI shell with: ollama serve"
+            '';
+          };
+          android = mkNixShipShell {
+            label = "Android development";
+            packages = basePackages ++ (with pkgs; [
+              android-tools
+              curl
+              jdk21_headless
+              maestro
+              yq-go
+            ]);
+          };
         });
 
       packages = forAllSystems (system:
@@ -46,7 +72,9 @@
         in {
           default = import ./nixship.nix {
             inherit pkgs self systems;
+            ollamaNixRef = "github:NixOS/nixpkgs/${nixpkgs.rev}#ollama";
           };
+          ollama = pkgs.ollama;
         });
 
       apps = forAllSystems (system: {
