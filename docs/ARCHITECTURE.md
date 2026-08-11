@@ -15,6 +15,7 @@ custom Node HTTP server + Next.js App Router
     |-- GitHub reconciler
     |-- provider-neutral routing
     |-- Cloudflare Quick/named tunnel controllers
+    |-- optional read-only AI planner + deterministic plan executor
     |-- per-app LAN proxy listeners
     |
     +--> git
@@ -74,6 +75,30 @@ $PLATFORM_DATA_DIR/
 ```
 
 The Nix store and release worktrees are replaceable. Application state is separate and passed as `DATA_DIR`.
+
+AI conversations are encrypted with the existing master key. AI plans, hashes,
+state snapshots, runs, step results and short-lived resource locks live in SQLite.
+They do not replace application or deployment state.
+
+## AI control boundary
+
+```text
+user -> model (read tools only) -> proposed canonical plan
+     -> exact hash approval -> TypeScript executor -> domain service -> verification
+```
+
+The model transport exposes a bounded set of typed read capabilities, capability
+search, ordinary/secure input requests and plan proposal. Mutation capabilities
+are registry entries but are never sent to the model as executable tools. Coverage
+includes application/deployment lifecycle, settings, sources, integrations,
+domains, providers/models and managed Ollama. Execution rechecks the current human
+role and captured state, takes sorted resource locks, records stable idempotency
+keys, audits the real user and reports success only after service verification.
+
+AI SDK UI transports chat outcomes to the global drawer. Approved work is detached
+from the request and publishes authoritative run-step, deployment and Ollama-pull
+events over authenticated SSE. SQLite remains authoritative for plans and runs;
+the model is not called during execution.
 
 ## Deployment state machine
 

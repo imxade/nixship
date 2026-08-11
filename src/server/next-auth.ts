@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
-import { type AuthenticatedUser, authenticateSession } from "./auth.ts";
+import {
+  type AuthenticatedActor,
+  type AuthenticatedUser,
+  authenticateSession,
+  authenticateSessionActor,
+} from "./auth.ts";
 import { HttpError } from "./errors.ts";
 
 export const SESSION_COOKIE = "platform_session";
@@ -22,6 +27,12 @@ export function requestUser(request: NextRequest): AuthenticatedUser {
   const user = authenticateSession(request.cookies.get(SESSION_COOKIE)?.value);
   if (!user) throw new HttpError(401, "Authentication required", "unauthenticated");
   return user;
+}
+
+export function requestActor(request: NextRequest): AuthenticatedActor {
+  const actor = authenticateSessionActor(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!actor) throw new HttpError(401, "Authentication required", "unauthenticated");
+  return actor;
 }
 
 export function clientIp(request: NextRequest): string | null {

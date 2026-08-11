@@ -94,7 +94,41 @@ For the integrated Android app, replace the local key-file fallback with Android
   expanded-size limits. Extraction rejects traversal, original-name sanitization, symlinks and
   non-regular entries, verifies CRC/digest, and atomically publishes only a complete locked flake.
 - Applications receive a controlled working directory and explicit runtime variables.
+- Control-plane `PLATFORM_*` environment variables, including the master key and
+  optional AI provider key, are removed from the inherited workload environment.
+  Only the documented runtime contract and explicitly stored application variables
+  are added for the workload.
 - Each application starts in a distinct POSIX process group for group termination.
+
+## AI planning and execution
+
+- The optional planning model receives registered read capabilities only. It has
+  no shell, SQL, filesystem, generic HTTP or mutating capability implementation.
+- Every AI mutation is a strict Zod-validated, canonicalized plan whose SHA-256
+  hash, creator, expiry, capability versions, resource keys and state snapshot are
+  persisted before approval.
+- Approval and execution re-evaluate the authenticated human actor and role.
+  Application mutation locks are acquired in sorted order and preconditions are
+  checked again under the execution path.
+- Conversation bodies are encrypted at rest. Environment/provider credentials are
+  not accepted as ordinary chat input, stored in transcripts, or sent to a model.
+- New Cloudflare, Harbur and provider credentials use masked secure-input cards.
+  Opaque references are actor/scope bound, expire after 30 minutes and are consumed
+  once; stored secret values have no AI read path.
+- Sensitive/destructive approval requires a five-minute current-password grant.
+  Destructive approval also requires the exact server-generated phrase.
+- OpenAI-compatible provider redirects are rejected, responses and timeouts are
+  bounded, public endpoints require TLS, private endpoints require explicit operator
+  enablement, and link-local/metadata destinations are blocked.
+- Repository text, logs and provider output are labeled untrusted in the system
+  policy and cannot create mutation authority because no mutation tool is present.
+- A provider/model must pass the bounded strict-tool, exact-plan, prompt-injection
+  and opaque-secret compatibility probe before its first proposed mutation plan is
+  accepted. Probe failure leaves ordinary answer mode available.
+- Managed Ollama is optional, lazy, loopback-only, process-identity checked and
+  defaults to one loaded model and one parallel request. An occupied endpoint that
+  Nix Ship does not own is rejected. Pull progress is parsed from Ollama's real
+  stream, never generated as model prose.
 
 ## Remaining high-priority hardening
 

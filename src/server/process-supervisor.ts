@@ -56,7 +56,7 @@ export class ProcessSupervisor {
       .prepare("SELECT key, value_encrypted FROM app_environment WHERE app_id = ?")
       .all(app.id) as Array<{ key: string; value_encrypted: string }>;
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
+      ...workloadBaseEnvironment(process.env),
       ...Object.fromEntries(envRows.map((row) => [row.key, decryptSecret(row.value_encrypted)])),
       MANAGED_DEPLOYMENT: "1",
       APP_ID: app.id,
@@ -263,6 +263,14 @@ export class ProcessSupervisor {
       });
     }
   }
+}
+
+export function workloadBaseEnvironment(
+  source: Readonly<Record<string, string | undefined>>,
+): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(source).filter(([key]) => !key.toUpperCase().startsWith("PLATFORM_")),
+  ) as NodeJS.ProcessEnv;
 }
 
 function terminateProcessGroup(processGroupId: number, signal: NodeJS.Signals): void {

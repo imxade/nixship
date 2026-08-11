@@ -1,8 +1,28 @@
 # Implementation Status
 
-Last updated: 2026-08-09.
+Last updated: 2026-08-11.
 
 ## Implemented
+
+- Approval-gated AI control plane using AI SDK Core/UI: encrypted conversations,
+  bounded read-only tool loops, capability search, strict immutable SHA-256 plans,
+  actor/session/RBAC/state/version checks, sorted resource locks, deterministic
+  background execution, run SSE, real deployment/model-pull progress, verification,
+  cancellation of unapproved plans, current-password re-authentication and masked
+  one-use secure references.
+- Typed capabilities cover system/app/deployment/settings reads and mutations,
+  public GitHub/Harbur source inspection and deployment, environment keys,
+  lifecycle/promotion/cancellation, Cloudflare connection/domains/tunnel state,
+  Harbur connections, provider profiles/defaults/probes, and managed Ollama.
+- Provider/model profiles are persisted without returning keys. Conversation and
+  action-planner selection are independent, and an exact compatibility probe keeps
+  nonconforming models in answer-only mode. The composer includes a searchable
+  install/select/remove model picker.
+- Node.js 24 is now the consistent development, package-engine and Nix runtime
+  baseline.
+- `nix develop .#ai` and `packages.ollama` supply flake-pinned Ollama. The production
+  manager lazily realizes it into a GC root, owns a loopback-only process identity,
+  applies low-resource concurrency limits and leaves it outside the base closure.
 
 - User-facing brand values remain centralized while runtime identifiers use the
   neutral `PLATFORM_*` contract. Old environment, data, backup, and executable
@@ -277,7 +297,33 @@ forwarded-header trust, secure forwarded-HTTPS cookies and sanitized Git
 credentials. Five unused server exports and two redundant routing helpers were
 removed. The production dependency audit reports no known vulnerabilities.
 
+AI integration evidence on 2026-08-11 includes a real isolated deployment of
+`https://github.com/imxade/kitsy` as `Kitsy AI GitHub E2E 20f9ed`: source inspection
+preceded planning, no application existed before exact approval, the deterministic
+executor built commit `693022c9f241ec15f72d5a1fc42c7e314d9359a1`, activated it,
+and received HTTP 200. Flake-built Ollama 0.32.1 also passed isolated lazy
+enable/readiness/process-identity/list/disable checks.
+
+Live local-model probes were run against Qwen 2.5 3B/7B, Granite 3.3 2B/8B and
+Llama 3 Groq Tool Use 8B. They answered ordinary questions and respected the tested
+secret/prompt-injection boundary, but none produced the exact strict nested plan
+schema required by the compatibility probe. They are therefore correctly treated
+as answer-only; deterministic fake-provider tests remain the authority for control
+plane correctness.
+
+Private `rb/kitsy` passed the isolated Harbur acceptance test after its read token
+was supplied process-locally and immediately converted to a scoped encrypted
+one-use reference. Separate approved connection and deployment plans activated the
+digest-verified snapshot as `Nix Ship AI Harbur E2E e9b17c`; the active release
+returned HTTP 200. The real public fallback `rb/aunix` was correctly rejected for
+missing `flake.nix`, and `rb/nixship` was correctly rejected at health activation
+after binding to the machine hostname instead of its assigned loopback address.
+
 ## External and platform evidence still required
+
+- No tested local model qualified as an action planner. Configure a stronger remote
+  OpenAI-compatible model, or a future local model that passes the exact probe;
+  answer-only local use remains supported.
 
 - GitHub live-account authorization, selected-repository install, private clone
   and signed public webhook delivery are pending the owner’s test-account

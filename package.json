@@ -11,7 +11,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "pnpm": {
     "overrides": {
@@ -36,6 +36,10 @@
     "test:examples": "tsx tests/integration/examples.ts",
     "test:github-public": "tsx tests/integration/public-github.ts",
     "test:harbur-private": "tsx tests/integration/harbur-private.ts",
+    "test:ai-local": "tsx tests/integration/ai-local.ts",
+    "test:ai-github": "tsx tests/integration/ai-public-github.ts",
+    "test:ai-ollama": "tsx tests/integration/ai-ollama-runtime.ts",
+    "test:ai-harbur": "tsx tests/integration/ai-harbur-public.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm biome:ci && pnpm typecheck && pnpm test && pnpm build",
@@ -45,6 +49,9 @@
     "restore": "tsx scripts/restore.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.29",
+    "@ai-sdk/react": "4.0.62",
+    "ai": "7.0.59",
     "better-sqlite3": "13.0.1",
     "jszip": "3.10.1",
     "next": "16.2.11",
