@@ -224,6 +224,32 @@ describe("AI plan security boundary", () => {
     ).toEqual({ status: "failed", error_code: "resource_locked" });
   });
 
+  it("renews resource lock leases for long-running plans", async () => {
+    const conversation = conversations.createConversation(owner);
+    const stored = plans.persistProposedPlan(
+      conversation.id,
+      owner,
+      await validatedRename("Lease test", owner),
+    );
+    const db = database.getDb();
+    db.prepare(
+      "INSERT INTO ai_plan_runs(id, plan_id, status, created_at) VALUES ('lease-run', ?, 'running', ?)",
+    ).run(stored.id, new Date().toISOString());
+    db.prepare(
+      `INSERT INTO ai_resource_locks(resource_key, run_id, acquired_at, expires_at)
+       VALUES (?, 'lease-run', ?, '2026-07-24T12:01:00.000Z')`,
+    ).run(`app:${appId}`, new Date().toISOString());
+
+    const minimumExpiry = Date.now() + 10 * 60_000;
+    executor.renewLocks("lease-run");
+
+    const expiresAt = db
+      .prepare("SELECT expires_at FROM ai_resource_locks WHERE run_id = 'lease-run'")
+      .pluck()
+      .get() as string;
+    expect(Date.parse(expiresAt)).toBeGreaterThanOrEqual(minimumExpiry);
+  });
+
   it("rejects viewer plans, unregistered capabilities, extra fields, and false resource keys", async () => {
     await expect(validatedRename("Denied", viewer)).rejects.toMatchObject({ code: "forbidden" });
     await expect(

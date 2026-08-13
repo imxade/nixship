@@ -40,6 +40,7 @@ export function CloudflareClient() {
   const [dashboardLinks, setDashboardLinks] = useState<AccessLink[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +72,10 @@ export function CloudflareClient() {
 
   async function configureToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!currentPassword) {
+      setError("Enter your current password before changing Cloudflare settings.");
+      return;
+    }
     setBusy("token");
     const form = new FormData(event.currentTarget);
     try {
@@ -82,9 +87,11 @@ export function CloudflareClient() {
             apiToken: form.get("apiToken"),
             tunnelName: form.get("tunnelName"),
             dashboardHostname: form.get("dashboardHostname"),
+            currentPassword,
           }),
         }),
       );
+      setCurrentPassword("");
       await load();
       setError("");
     } catch (cause) {
@@ -96,15 +103,20 @@ export function CloudflareClient() {
 
   async function saveDashboardHostname(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!currentPassword) {
+      setError("Enter your current password before changing Cloudflare settings.");
+      return;
+    }
     setBusy("dashboard");
     const form = new FormData(event.currentTarget);
     try {
       setStatus(
         await apiFetch<Status>("/api/cloudflare/dashboard", {
           method: "PUT",
-          body: JSON.stringify({ hostname: form.get("hostname") }),
+          body: JSON.stringify({ hostname: form.get("hostname"), currentPassword }),
         }),
       );
+      setCurrentPassword("");
       await load();
       setError("");
     } catch (cause) {
@@ -115,13 +127,19 @@ export function CloudflareClient() {
   }
 
   async function toggleNamedTunnel() {
+    if (!currentPassword) {
+      setError("Enter your current password before changing Cloudflare settings.");
+      return;
+    }
     setBusy("toggle");
     try {
       setStatus(
         await apiFetch<Status>(`/api/cloudflare/${status?.enabled ? "disable" : "enable"}`, {
           method: "POST",
+          body: JSON.stringify({ currentPassword }),
         }),
       );
+      setCurrentPassword("");
       await load();
       setError("");
     } catch (cause) {
@@ -135,9 +153,19 @@ export function CloudflareClient() {
     status?.routes.some((route) => route.status === "pending" || route.status === "error") ?? false;
 
   async function sync() {
+    if (!currentPassword) {
+      setError("Enter your current password before changing Cloudflare settings.");
+      return;
+    }
     setBusy("sync");
     try {
-      setStatus(await apiFetch<Status>("/api/cloudflare/sync", { method: "POST" }));
+      setStatus(
+        await apiFetch<Status>("/api/cloudflare/sync", {
+          method: "POST",
+          body: JSON.stringify({ currentPassword }),
+        }),
+      );
+      setCurrentPassword("");
       await load();
       setError("");
     } catch (cause) {
@@ -148,13 +176,19 @@ export function CloudflareClient() {
   }
 
   async function confirmZone(apex: string) {
+    if (!currentPassword) {
+      setError("Enter your current password before changing Cloudflare settings.");
+      return;
+    }
     setBusy(`zone:${apex}`);
     try {
       setStatus(
         await apiFetch<Status>(`/api/cloudflare/zones/${encodeURIComponent(apex)}/confirm`, {
           method: "POST",
+          body: JSON.stringify({ currentPassword }),
         }),
       );
+      setCurrentPassword("");
       await load();
       setError("");
     } catch (cause) {
@@ -198,6 +232,25 @@ export function CloudflareClient() {
           </button>
         </div>
       )}
+
+      <section className="card mb-5 border border-base-300 bg-base-100">
+        <div className="card-body">
+          <h2 className="card-title">Confirm sensitive changes</h2>
+          <p className="text-sm text-base-content/65">
+            Enter your current Nix Ship password before changing credentials, DNS, or tunnel state.
+          </p>
+          <label className="form-control max-w-md">
+            <span className="label-text mb-1">Your current password</span>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.currentTarget.value)}
+              autoComplete="current-password"
+              className="input input-bordered"
+            />
+          </label>
+        </div>
+      </section>
 
       {status && (
         <section className="card mb-5 border border-base-300 bg-base-100">

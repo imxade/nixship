@@ -3,8 +3,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getApplicationsByRepositoryId, queueDeployment } from "@/server/app-service";
 import { getDb, nowIso } from "@/server/db";
+import { HttpError } from "@/server/errors";
 import { events } from "@/server/events";
 import { syncInstallations, webhookSecret } from "@/server/github";
+import { readBoundedText } from "@/server/http";
 import { logger } from "@/server/logger";
 
 export const runtime = "nodejs";
@@ -37,12 +39,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid GitHub webhook headers" }, { status: 400 });
   }
   const { delivery, event, signature } = parsedHeaders.data;
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_WEBHOOK_BYTES)
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
-  const body = await request.text();
-  if (Buffer.byteLength(body) > MAX_WEBHOOK_BYTES)
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  let body: string;
+  try {
+    body = await readBoundedText(request, MAX_WEBHOOK_BYTES);
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "body_too_large") {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    throw error;
+  }
 
   let secret: string;
   try {

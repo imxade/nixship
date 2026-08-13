@@ -99,15 +99,14 @@ export function consumeAiSecretReference(input: {
   return getDb().transaction(() => {
     const row = secretRow(input.secretRef);
     assertUsable(row, input);
+    const plaintext = decryptSecret(row.ciphertext);
     const changed = getDb()
-      .prepare(
-        "UPDATE ai_secret_refs SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL AND expires_at > ?",
-      )
-      .run(nowIso(), row.id, nowIso()).changes;
+      .prepare("DELETE FROM ai_secret_refs WHERE id = ? AND consumed_at IS NULL AND expires_at > ?")
+      .run(row.id, nowIso()).changes;
     if (changed !== 1) {
       throw new HttpError(409, "Secure input is no longer available", "secret_ref_stale");
     }
-    return decryptSecret(row.ciphertext);
+    return plaintext;
   })();
 }
 
@@ -126,6 +125,10 @@ function secretRow(id: string): SecretRow {
     | SecretRow
     | undefined;
   if (!row) throw new HttpError(409, "Secure input is missing or expired", "secret_ref_stale");
+  if (row.consumed_at || Date.parse(row.expires_at) <= Date.now()) {
+    getDb().prepare("DELETE FROM ai_secret_refs WHERE id = ?").run(id);
+    throw new HttpError(409, "Secure input is missing or expired", "secret_ref_stale");
+  }
   return row;
 }
 
@@ -142,7 +145,7 @@ function assertUsable(
     row.kind === input.kind &&
     row.scope_type === input.scope.type &&
     row.scope_id === input.scope.id;
-  if (!matches || row.consumed_at || Date.parse(row.expires_at) <= Date.now()) {
+  if (!matches) {
     throw new HttpError(409, "Secure input is missing or expired", "secret_ref_stale");
   }
 }

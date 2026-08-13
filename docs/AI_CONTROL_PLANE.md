@@ -330,8 +330,9 @@ reference. The next model-visible message contains only that reference, kind and
 statement that plaintext is unavailable.
 
 The reference is bound to the actor, kind and scope, expires after 30 minutes and is
-consumed once by the deterministic capability. The plaintext is never placed in chat
-history, plan metadata, tool results or model context.
+consumed once by the deterministic capability. Its encrypted reference row is deleted
+as part of consumption. The plaintext is never placed in chat history, plan metadata,
+tool results or model context.
 
 ## Implementation map
 

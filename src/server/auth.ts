@@ -128,8 +128,9 @@ export async function login(input: {
   const user = getDb()
     .prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE")
     .get(username) as UserRow | undefined;
-  const valid =
-    user && !user.disabled ? await verifyPassword(input.password, user.password_hash) : false;
+  const fallbackHash = user?.password_hash ?? firstActivePasswordHash();
+  const passwordMatches = fallbackHash ? await verifyPassword(input.password, fallbackHash) : false;
+  const valid = Boolean(user && !user.disabled && passwordMatches);
   if (!valid || !user) {
     recordLoginFailures(buckets);
     audit({ action: "auth.login_failed", ip: input.ip, details: { username } });
@@ -231,7 +232,13 @@ export async function changeOwnPassword(input: {
   if (!user || user.disabled) {
     throw new HttpError(401, "Authentication required", "unauthenticated");
   }
-  if (!(await verifyPassword(input.currentPassword, user.password_hash))) {
+  if (
+    !(await verifyCurrentPassword({
+      userId: user.id,
+      password: input.currentPassword,
+      ip: input.ip,
+    }))
+  ) {
     audit({
       userId: user.id,
       action: "auth.password_change_failed",
@@ -273,6 +280,61 @@ export async function changeOwnPassword(input: {
   });
 }
 
+export async function verifyCurrentPassword(input: {
+  userId: string;
+  password: string;
+  ip?: string | null;
+}): Promise<boolean> {
+  const source = input.ip ?? "unknown";
+  const credentialBucket = {
+    key: `current-password:${sha256(`${source}\n${input.userId}`)}`,
+    limit: CREDENTIAL_FAILURE_LIMIT,
+  };
+  const buckets = [
+    credentialBucket,
+    { key: `current-password-source:${sha256(source)}`, limit: SOURCE_FAILURE_LIMIT },
+  ];
+  enforceLoginRateLimits(buckets, {
+    message: "Too many failed password checks. Try again later",
+    code: "password_check_rate_limited",
+  });
+  const user = getDb().prepare("SELECT * FROM users WHERE id = ?").get(input.userId) as
+    | UserRow
+    | undefined;
+  const fallbackHash = user?.password_hash ?? firstActivePasswordHash();
+  const passwordMatches = fallbackHash ? await verifyPassword(input.password, fallbackHash) : false;
+  const valid = Boolean(user && !user.disabled && passwordMatches);
+  if (!valid) {
+    recordLoginFailures(buckets);
+    return false;
+  }
+  clearLoginFailures(credentialBucket.key);
+  return true;
+}
+
+export async function requireCurrentPassword(input: {
+  user: AuthenticatedUser;
+  password: string;
+  ip?: string | null;
+}): Promise<void> {
+  if (
+    !(await verifyCurrentPassword({
+      userId: input.user.id,
+      password: input.password,
+      ip: input.ip,
+    }))
+  ) {
+    audit({
+      userId: input.user.id,
+      action: "auth.sensitive_reauth_failed",
+      entityType: "user",
+      entityId: input.user.id,
+      ip: input.ip,
+    });
+    throw new HttpError(401, "Current password is incorrect", "invalid_current_password");
+  }
+}
+
 export function requireRole(user: AuthenticatedUser, allowed: Role[]): void {
   if (!allowed.includes(user.role)) {
     throw new HttpError(403, "You do not have permission to perform this action", "forbidden");
@@ -305,7 +367,13 @@ function validatePassword(password: string): void {
   }
 }
 
-function enforceLoginRateLimits(buckets: LoginRateBucket[]): void {
+function enforceLoginRateLimits(
+  buckets: LoginRateBucket[],
+  error: { message: string; code: string } = {
+    message: "Too many failed sign-in attempts. Try again later",
+    code: "login_rate_limited",
+  },
+): void {
   const db = getDb();
   for (const bucket of buckets) {
     const row = db
@@ -325,12 +393,7 @@ function enforceLoginRateLimits(buckets: LoginRateBucket[]): void {
       (row.blocked_until && Date.parse(row.blocked_until) > Date.now())
     ) {
       const retryAfterSeconds = Math.max(1, Math.ceil((windowEnds - Date.now()) / 1000));
-      throw new HttpError(
-        429,
-        "Too many failed sign-in attempts. Try again later",
-        "login_rate_limited",
-        retryAfterSeconds,
-      );
+      throw new HttpError(429, error.message, error.code, retryAfterSeconds);
     }
   }
 }
@@ -370,4 +433,13 @@ function recordLoginFailures(buckets: LoginRateBucket[]): void {
 
 function clearLoginFailures(key: string): void {
   getDb().prepare("DELETE FROM login_attempts WHERE key = ?").run(key);
+}
+
+function firstActivePasswordHash(): string | null {
+  return (
+    (getDb()
+      .prepare("SELECT password_hash FROM users WHERE disabled = 0 ORDER BY created_at LIMIT 1")
+      .pluck()
+      .get() as string | undefined) ?? null
+  );
 }

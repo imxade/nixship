@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeDomain } from "../../src/server/app-service.ts";
-import { requestHostname } from "../../src/server/proxy-manager.ts";
+import { requestHostname, trustedForwardedProtocol } from "../../src/server/proxy-manager.ts";
 
 describe("custom domains", () => {
   it("normalizes case, a trailing dot, and internationalized names", () => {
@@ -24,5 +24,11 @@ describe("custom domains", () => {
     expect(requestHostname("app.example.com.")).toBe("app.example.com");
     expect(requestHostname("127.0.0.1:3000")).toBeNull();
     expect(requestHostname(undefined)).toBeNull();
+  });
+
+  it("preserves HTTPS only from a loopback reverse proxy", () => {
+    expect(trustedForwardedProtocol("127.0.0.1", "https", false)).toBe("https");
+    expect(trustedForwardedProtocol("192.0.2.40", "https", false)).toBe("http");
+    expect(trustedForwardedProtocol("192.0.2.40", undefined, true)).toBe("https");
   });
 });

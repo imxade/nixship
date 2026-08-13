@@ -83,14 +83,29 @@ export async function readFormUrlEncoded(
   return result;
 }
 
-async function readBoundedText(request: NextRequest, maxBytes: number): Promise<string> {
+export async function readBoundedText(request: NextRequest, maxBytes: number): Promise<string> {
   const length = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(length) && length > maxBytes) {
     throw new HttpError(413, "Request body is too large", "body_too_large");
   }
-  const text = await request.text();
-  if (Buffer.byteLength(text) > maxBytes) {
-    throw new HttpError(413, "Request body is too large", "body_too_large");
+  if (!request.body) return "";
+
+  const reader = request.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(413, "Request body is too large", "body_too_large");
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return text;
+  return Buffer.concat(chunks, total).toString("utf8");
 }

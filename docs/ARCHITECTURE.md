@@ -98,7 +98,8 @@ schema-validated and returned for another bounded model step. A plan call is par
 previewed against the server registry, canonicalized, hashed and persisted; it is
 not executed. Exact approval later reloads the persisted plan. The executor resolves
 each capability by ID/version, rechecks role and state, locks resources, validates
-input/output and verifies the real effect without another model call.
+input/output and verifies the real effect without another model call. Long-running
+steps renew their resource-lock leases until completion.
 
 The complete message, tool, plan, approval and run-result formats are documented in
 [`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md).

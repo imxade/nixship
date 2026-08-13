@@ -21,7 +21,9 @@ const actor = {
 
 beforeEach(() => {
   const db = database.getDb();
-  db.exec("DELETE FROM ai_secret_refs; DELETE FROM sessions; DELETE FROM users;");
+  db.exec(
+    "DELETE FROM ai_reauth_grants; DELETE FROM ai_secret_refs; DELETE FROM login_attempts; DELETE FROM sessions; DELETE FROM users;",
+  );
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO users(id, username, password_hash, role, disabled, created_at, updated_at)
@@ -70,6 +72,12 @@ describe("opaque AI secure input", () => {
         scope,
       }),
     ).toBe(marker);
+    expect(
+      database
+        .getDb()
+        .prepare("SELECT 1 FROM ai_secret_refs WHERE id = ?")
+        .get(reference.secretRef),
+    ).toBeUndefined();
     expect(() =>
       secrets.consumeAiSecretReference({
         actor,
@@ -108,5 +116,16 @@ describe("AI plan reauthentication", () => {
     const grant = await reauth.createAiReauthGrant(actor, "correct horse battery staple");
     expect(Date.parse(grant.expiresAt)).toBeGreaterThan(Date.now());
     expect(() => reauth.assertFreshAiReauth(actor)).not.toThrow();
+  });
+
+  it("limits repeated current-password failures", async () => {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await expect(
+        reauth.createAiReauthGrant(actor, "wrong password", "192.0.2.55"),
+      ).rejects.toMatchObject({ code: "reauth_failed" });
+    }
+    await expect(
+      reauth.createAiReauthGrant(actor, "wrong password", "192.0.2.55"),
+    ).rejects.toMatchObject({ code: "password_check_rate_limited", status: 429 });
   });
 });
