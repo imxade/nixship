@@ -15,6 +15,7 @@ export function UsersClient() {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const load = useCallback(async () => {
     try {
       setUsers(await apiFetch<User[]>("/api/users"));
@@ -38,9 +39,11 @@ export function UsersClient() {
           username: f.get("username"),
           password: f.get("password"),
           role: f.get("role"),
+          currentPassword,
         }),
       });
       element.reset();
+      setCurrentPassword("");
       await load();
     } catch (c) {
       setError(c instanceof Error ? c.message : "Create failed");
@@ -49,11 +52,16 @@ export function UsersClient() {
     }
   }
   async function toggle(user: User) {
+    if (!currentPassword) {
+      setError("Enter your current password before changing a user.");
+      return;
+    }
     try {
       await apiFetch(`/api/users/${user.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ disabled: !user.disabled }),
+        body: JSON.stringify({ disabled: !user.disabled, currentPassword }),
       });
+      setCurrentPassword("");
       await load();
     } catch (c) {
       setError(c instanceof Error ? c.message : "Update failed");
@@ -114,6 +122,18 @@ export function UsersClient() {
         >
           <div className="card-body">
             <h2 className="card-title">Add user</h2>
+            <label className="form-control">
+              <span className="label-text mb-1">Your current password</span>
+              <input
+                required
+                name="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.currentTarget.value)}
+                autoComplete="current-password"
+                className="input input-bordered"
+              />
+            </label>
             <label className="form-control">
               <span className="label-text mb-1">Username</span>
               <input name="username" required minLength={3} className="input input-bordered" />

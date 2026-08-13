@@ -128,7 +128,7 @@ export class ProxyManager {
     headers.host = request.headers.host;
     headers["x-forwarded-for"] = clientIp;
     headers["x-forwarded-host"] = firstHeader(request.headers.host) ?? "";
-    headers["x-forwarded-proto"] = isEncryptedSocket(request.socket) ? "https" : "http";
+    headers["x-forwarded-proto"] = forwardedProtocol(request);
     if (isLoopback(request.socket.remoteAddress)) headers["cf-connecting-ip"] = clientIp;
 
     const upstream = http.request(
@@ -194,9 +194,7 @@ export class ProxyManager {
       const clientIp = forwardedClientIp(request);
       headerLines.push(`X-Forwarded-For: ${clientIp}`);
       headerLines.push(`X-Forwarded-Host: ${request.headers.host ?? ""}`);
-      headerLines.push(
-        `X-Forwarded-Proto: ${isEncryptedSocket(request.socket) ? "https" : "http"}`,
-      );
+      headerLines.push(`X-Forwarded-Proto: ${forwardedProtocol(request)}`);
       if (isLoopback(request.socket.remoteAddress)) {
         headerLines.push(`CF-Connecting-IP: ${clientIp}`);
       }
@@ -245,6 +243,23 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
 
 function isEncryptedSocket(socket: Duplex): boolean {
   return Boolean((socket as Duplex & { encrypted?: boolean }).encrypted);
+}
+
+function forwardedProtocol(request: IncomingMessage): "http" | "https" {
+  return trustedForwardedProtocol(
+    request.socket.remoteAddress,
+    firstHeader(request.headers["x-forwarded-proto"]),
+    isEncryptedSocket(request.socket),
+  );
+}
+
+export function trustedForwardedProtocol(
+  remoteAddress: string | undefined,
+  forwarded: string | undefined,
+  encrypted: boolean,
+): "http" | "https" {
+  if (isLoopback(remoteAddress) && forwarded?.trim().toLowerCase() === "https") return "https";
+  return encrypted ? "https" : "http";
 }
 
 function forwardedClientIp(request: IncomingMessage): string {

@@ -2,6 +2,26 @@ import { HttpError } from "./errors.ts";
 
 const MAX_ENVIRONMENT_ENTRIES = 200;
 
+export const APPLICATION_RUNTIME_ENVIRONMENT_KEYS = [
+  "MANAGED_DEPLOYMENT",
+  "APP_ID",
+  "APP_NAME",
+  "DEPLOYMENT_ID",
+  "RELEASE_DIR",
+  "DATA_DIR",
+  "CACHE_DIR",
+  "LOG_DIR",
+  "HOST",
+  "PORT",
+] as const;
+
+const applicationRuntimeEnvironmentKeys = new Set<string>(APPLICATION_RUNTIME_ENVIRONMENT_KEYS);
+
+export function isReservedApplicationEnvironmentKey(key: string): boolean {
+  const normalized = key.toUpperCase();
+  return normalized.startsWith("PLATFORM_") || applicationRuntimeEnvironmentKeys.has(normalized);
+}
+
 export function parseEnvironmentText(text: string): Record<string, string> {
   const variables: Record<string, string> = {};
   const seen = new Set<string>();

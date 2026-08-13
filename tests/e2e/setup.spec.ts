@@ -371,6 +371,7 @@ EMPTY=
       apiToken: "restricted-cloudflare-token",
       tunnelName: "nixship",
       dashboardHostname: "console.example.com",
+      currentPassword: "new correct horse battery staple",
     });
     cloudflareConfigured = true;
     await route.fulfill({
@@ -392,6 +393,7 @@ EMPTY=
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/integrations/cloudflare");
   await expect(page.getByRole("button", { name: "Connect Cloudflare" })).toBeVisible();
+  await page.getByLabel("Your current password").fill("new correct horse battery staple");
   await page.getByLabel("Cloudflare account ID").fill("a".repeat(32));
   await page.getByLabel("API token").fill("restricted-cloudflare-token");
   await page.getByLabel("Dashboard hostname (optional)").fill("console.example.com");
@@ -415,6 +417,20 @@ EMPTY=
   expect(rejectedOrigin.status()).toBe(403);
 
   await page.goto("/users");
+  const missingReauthentication = await page.evaluate(async () => {
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "missing-reauth",
+        password: "temporary password 123",
+        role: "viewer",
+      }),
+    });
+    return response.status;
+  });
+  expect(missingReauthentication).toBe(400);
+  await page.getByLabel("Your current password").fill("new correct horse battery staple");
   await page.getByLabel("Username").fill("viewer");
   await page.getByLabel("Temporary password").fill("viewer password 123");
   await page.getByLabel("Role").selectOption("viewer");

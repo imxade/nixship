@@ -1,6 +1,5 @@
 import { audit } from "../audit.ts";
-import type { AuthenticatedActor } from "../auth.ts";
-import { verifyPassword } from "../crypto.ts";
+import { type AuthenticatedActor, verifyCurrentPassword } from "../auth.ts";
 import { getDb, nowIso } from "../db.ts";
 import { HttpError } from "../errors.ts";
 
@@ -9,16 +8,15 @@ const REAUTH_TTL_MS = 5 * 60_000;
 export async function createAiReauthGrant(
   actor: AuthenticatedActor,
   password: string,
+  ip?: string | null,
 ): Promise<{ expiresAt: string }> {
-  const row = getDb()
-    .prepare("SELECT password_hash FROM users WHERE id = ? AND disabled = 0")
-    .get(actor.id) as { password_hash: string } | undefined;
-  if (!row || !(await verifyPassword(password, row.password_hash))) {
+  if (!(await verifyCurrentPassword({ userId: actor.id, password, ip }))) {
     audit({
       userId: actor.id,
       action: "ai.reauth_failed",
       entityType: "session",
       entityId: actor.sessionId,
+      ip,
     });
     throw new HttpError(401, "Current password is incorrect", "reauth_failed");
   }
@@ -39,6 +37,7 @@ export async function createAiReauthGrant(
     action: "ai.reauthenticated",
     entityType: "session",
     entityId: actor.sessionId,
+    ip,
   });
   return { expiresAt };
 }

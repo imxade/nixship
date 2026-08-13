@@ -47,6 +47,9 @@ dashboard administration remains available when the model is absent or unhealthy
 Owners/admins can configure OpenAI-compatible providers through masked secure
 input. Provider keys are encrypted and never returned. Conversation and planner
 defaults are separate; only probe-qualified profiles can plan actions.
+The model-visible messages and capabilities, strict plan format, approval boundary
+and deterministic run result are documented in
+[`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md).
 
 Run the opt-in compatibility probe against a small local model with:
 

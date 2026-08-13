@@ -141,9 +141,12 @@ async function executeRun(
 ): Promise<void> {
   const resourceKeys = [...new Set(plan.steps.flatMap((step) => step.resourceKeys))].sort();
   let locksAcquired = false;
+  let lockRenewalTimer: NodeJS.Timeout | null = null;
   try {
     acquireLocks(runId, resourceKeys);
     locksAcquired = true;
+    lockRenewalTimer = setInterval(() => renewLocks(runId), 60_000);
+    lockRenewalTimer.unref();
     setRunState(runId, "running");
     events.publish("ai.run.started", `ai-run:${runId}`, { runId });
     for (const step of plan.steps) {
@@ -234,6 +237,7 @@ async function executeRun(
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, errorMessage(error), code);
   } finally {
+    if (lockRenewalTimer) clearInterval(lockRenewalTimer);
     if (locksAcquired) {
       getDb().prepare("DELETE FROM ai_resource_locks WHERE run_id = ?").run(runId);
     }
@@ -294,6 +298,18 @@ function acquireLocks(runId: string, resourceKeys: string[]): void {
       "A plan is already changing one of these resources",
       "resource_locked",
     );
+  }
+}
+
+export function renewLocks(runId: string): void {
+  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  try {
+    getDb()
+      .prepare("UPDATE ai_resource_locks SET expires_at = ? WHERE run_id = ?")
+      .run(expiresAt, runId);
+  } catch {
+    // A transient SQLite busy period is harmless because the existing lease retains
+    // several more minutes and the next heartbeat retries.
   }
 }
 

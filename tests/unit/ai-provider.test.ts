@@ -79,4 +79,26 @@ describe("OpenAI-compatible provider transport", () => {
       provider.complete([{ role: "user", content: "List apps" }], []),
     ).rejects.toMatchObject({ code: "invalid_tool_input" });
   });
+
+  it("rejects a chunked provider response that exceeds the byte limit", async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: "http://127.0.0.1:11434/v1",
+      modelId: "qwen-small",
+      allowPrivateNetwork: true,
+      fetchImplementation: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(Buffer.alloc(700 * 1024, 65));
+              controller.enqueue(Buffer.alloc(700 * 1024, 66));
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    await expect(provider.complete([{ role: "user", content: "Hello" }], [])).rejects.toMatchObject(
+      { code: "ai_response_too_large" },
+    );
+  });
 });

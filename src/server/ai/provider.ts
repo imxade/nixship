@@ -110,12 +110,40 @@ export class OpenAiCompatibleProvider implements AiProvider {
 function secureProviderFetch(fetchImplementation: typeof fetch): typeof fetch {
   return async (input, init) => {
     const response = await fetchImplementation(input, { ...init, redirect: "error" });
-    const contentLength = Number(response.headers.get("content-length") ?? "0");
-    if (contentLength > 1024 * 1024) {
-      throw new HttpError(502, "AI provider response is too large", "ai_response_too_large");
-    }
-    return response;
+    const body = await readBoundedProviderResponse(response, 1024 * 1024);
+    return new Response(Uint8Array.from(body), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   };
+}
+
+async function readBoundedProviderResponse(response: Response, maxBytes: number): Promise<Buffer> {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new HttpError(502, "AI provider response is too large", "ai_response_too_large");
+  }
+  if (!response.body) return Buffer.alloc(0);
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(502, "AI provider response is too large", "ai_response_too_large");
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function toSdkTools(tools: ProviderTool[]): ToolSet {

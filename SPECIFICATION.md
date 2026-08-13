@@ -123,6 +123,12 @@ Credentials embedded in URLs, query strings, fragments, alternate hosts, local p
 
 A flake can execute arbitrary evaluation, build, and runtime code as the Nix Ship OS account. Nix reproducibility is not workload isolation. Only the node owner’s trusted repositories may be deployed.
 
+Workload processes receive only a reviewed host-compatibility environment, their
+explicitly stored application variables and the documented runtime contract.
+Arbitrary control-plane environment variables are not inherited. This minimizes
+accidental credential propagation but does not create isolation between same-user
+workloads.
+
 ## Source of truth
 
 Verified source and tests are authoritative for implemented behavior. When docs disagree with verified code, establish actual behavior from code/tests and update stale documentation in the same change.

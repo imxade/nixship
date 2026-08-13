@@ -27,16 +27,23 @@ Nix Ship protects the management interface and stored credentials from unauthent
   JavaScript handler cannot downgrade a credential submission to GET or place
   passwords in browser history, request URLs or query logs.
 - Failed logins are limited in fixed one-hour windows: six per source/username
-  pair and 30 across usernames from one source. Throttled responses include
+  pair and 30 across usernames from one source. Current-password checks use the
+  same limits for each user/source and source. Throttled responses include
   `Retry-After`.
+- User administration and direct Cloudflare mutations require the authenticated
+  owner/admin's current password in addition to the session. Sensitive and
+  destructive AI plans use a five-minute session-bound reauthentication grant.
 - Owner/admin/operator/viewer authorization checks on every write API.
 
 ## Request protection
 
 - Mutation requests require a same-host `Origin`.
-- JSON bodies have explicit size limits.
+- JSON and form bodies are read incrementally and cancelled as soon as their
+  explicit byte limit is exceeded, including the unauthenticated webhook path.
 - GitHub webhook bypasses browser-origin checks but requires SHA-256 HMAC validation.
 - Webhook delivery IDs are deduplicated.
+- Forwarded client and HTTPS metadata is accepted only from loopback tunnel/proxy
+  connections; direct-client forwarding headers are removed.
 - Security response headers and CSP are configured centrally.
 - Development CSP permits `unsafe-eval` because the React development runtime
   requires it for debugging. Production responses exclude `unsafe-eval`; the
@@ -94,13 +101,21 @@ For the integrated Android app, replace the local key-file fallback with Android
   expanded-size limits. Extraction rejects traversal, original-name sanitization, symlinks and
   non-regular entries, verifies CRC/digest, and atomically publishes only a complete locked flake.
 - Applications receive a controlled working directory and explicit runtime variables.
-- Control-plane `PLATFORM_*` environment variables, including the master key and
-  optional AI provider key, are removed from the inherited workload environment.
-  Only the documented runtime contract and explicitly stored application variables
-  are added for the workload.
+- Workloads inherit only a reviewed compatibility set needed to launch Nix across
+  supported platforms: basic identity/path, temporary-directory, locale, TLS,
+  selected Nix daemon and Nix-on-Droid variables. Arbitrary host variables,
+  control-plane `PLATFORM_*` values, credential variables, agent sockets and
+  process-injection settings are omitted.
+- Explicitly stored application variables are applied after compatible host values,
+  so an owner may deliberately configure values such as `HOME` or `PATH`. The
+  documented Nix Ship runtime variables are applied last and cannot be overridden.
 - Each application starts in a distinct POSIX process group for group termination.
 
 ## AI planning and execution
+
+The normalized model messages, exposed tool schemas, capability-search descriptors,
+strict plan format and deterministic execution result are documented in
+[`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md).
 
 - The optional planning model receives registered read capabilities only. It has
   no shell, SQL, filesystem, generic HTTP or mutating capability implementation.
@@ -114,12 +129,13 @@ For the integrated Android app, replace the local key-file fallback with Android
   not accepted as ordinary chat input, stored in transcripts, or sent to a model.
 - New Cloudflare, Harbur and provider credentials use masked secure-input cards.
   Opaque references are actor/scope bound, expire after 30 minutes and are consumed
-  once; stored secret values have no AI read path.
+  once; the encrypted reference row is deleted during consumption and stored secret
+  values have no AI read path.
 - Sensitive/destructive approval requires a five-minute current-password grant.
   Destructive approval also requires the exact server-generated phrase.
 - OpenAI-compatible provider redirects are rejected, responses and timeouts are
-  bounded, public endpoints require TLS, private endpoints require explicit operator
-  enablement, and link-local/metadata destinations are blocked.
+  bounded while streaming, public endpoints require TLS, private endpoints require
+  explicit operator enablement, and link-local/metadata destinations are blocked.
 - Repository text, logs and provider output are labeled untrusted in the system
   policy and cannot create mutation authority because no mutation tool is present.
 - A provider/model must pass the bounded strict-tool, exact-plan, prompt-injection
@@ -132,7 +148,6 @@ For the integrated Android app, replace the local key-file fallback with Android
 
 ## Remaining high-priority hardening
 
-- Add re-authentication for owner user-management and Cloudflare changes.
 - Add optional local TLS and passkeys.
 - Add interrupted-write and disk-full fault injection to backup/restore tests.
 - Obtain independent security review before exposing the dashboard to the internet.

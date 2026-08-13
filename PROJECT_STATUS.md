@@ -1,8 +1,17 @@
 # Implementation Status
 
-Last updated: 2026-08-11.
+Last updated: 2026-08-14.
 
 ## Implemented
+
+- Workload environment inheritance is now an explicit cross-platform compatibility
+  allowlist instead of a `PLATFORM_*` blacklist. Arbitrary host credentials, agent
+  sockets and process-injection variables are omitted; app-configured values retain
+  deterministic precedence while every runtime-owned name is reserved.
+- Request and provider-response limits are enforced during streaming, sensitive
+  direct administration requires a rate-limited current-password check, application
+  proxies preserve trusted Cloudflare HTTPS metadata, AI lock leases renew during
+  long operations, and consumed AI secret-reference ciphertext is deleted.
 
 - Approval-gated AI control plane using AI SDK Core/UI: encrypted conversations,
   bounded read-only tool loops, capability search, strict immutable SHA-256 plans,

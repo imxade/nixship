@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { audit } from "@/server/audit";
-import { requireRole } from "@/server/auth";
+import { requireCurrentPassword, requireRole } from "@/server/auth";
 import { api, readJson } from "@/server/http";
 import { clientIp, requestUser } from "@/server/next-auth";
 import { getRuntime } from "@/server/runtime";
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   hostname: z.string().trim().max(253).optional().default(""),
+  currentPassword: z.string().min(1).max(256),
 });
 
 export async function PUT(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function PUT(request: NextRequest) {
     const user = requestUser(request);
     requireRole(user, ["owner", "admin"]);
     const input = schema.parse(await readJson(request));
+    await requireCurrentPassword({ user, password: input.currentPassword, ip: clientIp(request) });
     const runtime = await getRuntime();
     await runtime.cloudflare.setDashboardHostname(input.hostname);
     audit({
