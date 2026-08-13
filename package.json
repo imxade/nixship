@@ -46,7 +46,8 @@
     "db:doctor": "tsx scripts/db-doctor.ts",
     "security:check": "tsx scripts/security-check.ts",
     "backup": "tsx scripts/backup.ts",
-    "restore": "tsx scripts/restore.ts"
+    "restore": "tsx scripts/restore.ts",
+    "nix:refresh-pnpm-hash": "node scripts/refresh-pnpm-deps-hash.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "3.0.29",

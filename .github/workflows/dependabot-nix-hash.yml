@@ -1,0 +1,83 @@
+name: Refresh Dependabot Nix hash
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: read
+
+jobs:
+  refresh:
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/npm_and_yarn/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Validate the Dependabot change scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          printf 'Dependabot changed: %s\n' "${changed_files[*]}"
+          has_lockfile=false
+          for changed_file in "${changed_files[@]}"; do
+            case "$changed_file" in
+              package.json) ;;
+              pnpm-lock.yaml) has_lockfile=true ;;
+              *)
+                echo "Refusing unexpected Dependabot file: $changed_file" >&2
+                exit 1
+                ;;
+            esac
+          done
+          if [[ "$has_lockfile" != true ]]; then
+            echo "Dependabot PR does not change pnpm-lock.yaml" >&2
+            exit 1
+          fi
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refresh the fixed-output dependency hash
+        run: node scripts/refresh-pnpm-deps-hash.ts
+
+      - name: Commit the refreshed hash
+        id: commit
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- nixship.nix; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$(git diff --name-only)" = "nixship.nix"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nixship.nix
+          git commit -m "build: refresh pnpm dependency hash"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN pushes do not emit another pull_request event. Dispatch CI
+      # explicitly so the new hash commit receives the required checks.
+      - name: Validate the updated Dependabot commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: gh workflow run ci.yml --ref "$HEAD_REF"
