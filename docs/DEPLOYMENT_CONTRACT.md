@@ -58,6 +58,23 @@ PORT=<candidate port>   # web apps only
 
 User-defined variables cannot replace reserved names.
 
+## Environment inheritance
+
+Nix Ship does not copy the complete control-plane environment into an application.
+It retains only a reviewed compatibility set for locating Nix, basic user identity,
+temporary files, locales, TLS certificates, a configured Nix daemon and
+Nix-on-Droid runtime paths. Variables such as `PLATFORM_*`, provider credentials,
+agent sockets, `NIX_CONFIG`, `NODE_OPTIONS`, preload hooks and arbitrary host values
+are not inherited.
+
+Environment precedence is compatible host values, then variables explicitly stored
+for the application, then the runtime variables listed above. Owners may deliberately
+configure `HOME` or `PATH`; runtime-owned names are rejected.
+
+The compatibility set is operational support for the Nix launcher, not an additional
+application API. Applications should rely only on their configured variables and the
+documented runtime variables.
+
 ## Invocation
 
 ```bash

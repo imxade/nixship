@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseEnvironmentText } from "../../src/server/environment.ts";
+import {
+  APPLICATION_RUNTIME_ENVIRONMENT_KEYS,
+  isReservedApplicationEnvironmentKey,
+  parseEnvironmentText,
+} from "../../src/server/environment.ts";
 
 describe("environment text parser", () => {
   it("accepts dotenv-style lines without exposing values later", () => {
@@ -34,5 +38,17 @@ second"
       /unexpected text after a quoted value/,
     );
     expect(() => parseEnvironmentText('TOKEN="unterminated')).toThrow(/unterminated quoted value/);
+  });
+
+  it("identifies every runtime-owned and platform-owned variable as reserved", () => {
+    for (const key of APPLICATION_RUNTIME_ENVIRONMENT_KEYS) {
+      expect(isReservedApplicationEnvironmentKey(key)).toBe(true);
+      expect(isReservedApplicationEnvironmentKey(key.toLowerCase())).toBe(true);
+    }
+    expect(isReservedApplicationEnvironmentKey("PLATFORM_MASTER_KEY")).toBe(true);
+    expect(isReservedApplicationEnvironmentKey("platform_provider_token")).toBe(true);
+    expect(isReservedApplicationEnvironmentKey("HOME")).toBe(false);
+    expect(isReservedApplicationEnvironmentKey("PATH")).toBe(false);
+    expect(isReservedApplicationEnvironmentKey("APP_SETTING")).toBe(false);
   });
 });

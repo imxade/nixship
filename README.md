@@ -80,12 +80,19 @@ through bounded read capabilities and can operate applications, deployments,
 environment metadata, GitHub/Harbur sources, Cloudflare domains, AI providers,
 model defaults, and the optional managed Ollama runtime.
 
-The model never receives mutation implementations. Changes are immutable plans
-bound to a canonical SHA-256 hash, state snapshot, capability versions and the
-authenticated human. Approval starts deterministic Nix Ship code; deployment and
-model-download progress comes from real runtime events. Sensitive/destructive
-plans require current-password re-authentication, and secure inputs become scoped,
-expiring, one-use opaque references that never enter model context.
+The model receives role-filtered read tools as JSON-Schema function definitions and
+discovers mutation descriptors through `capabilities_search`. It can return an
+answer, request an input, or call `propose_plan` with the strict versioned plan
+schema. Mutation implementations are never model-callable.
+
+Plans are bound to a canonical SHA-256 hash, state snapshot, capability versions and
+the authenticated human. Approval reloads the persisted plan and starts deterministic
+Nix Ship code; deployment and model-download progress comes from real runtime events.
+Sensitive/destructive plans require current-password re-authentication, and secure
+input plaintext never enters model context; the model sees only a scoped, expiring,
+one-use opaque reference. See
+[`docs/AI_CONTROL_PLANE.md`](docs/AI_CONTROL_PLANE.md) for the exact model message,
+tool-call, plan, approval and execution-result formats.
 
 Public GitHub repositories are inspected first. Both `flake.nix` and `flake.lock`
 must be committed; otherwise the assistant provides a starter flake and exact
@@ -125,6 +132,7 @@ See [`SPECIFICATION.md`](SPECIFICATION.md) for the normative platform requiremen
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [AI capability and plan protocol](docs/AI_CONTROL_PLANE.md)
 - [Deployment contract](docs/DEPLOYMENT_CONTRACT.md)
 - [Security model](docs/SECURITY.md)
 - [GitHub integration](docs/GITHUB.md)

@@ -111,4 +111,6 @@ tool call from acquiring mutation authority.
 resource locks, audit records, idempotency keys and postcondition verification are
 Nix Ship-owned contracts. AI outages never block the ordinary dashboard. Provider
 profiles, opaque secure references, separate model roles and lazy managed Ollama
-remain implementations of this boundary rather than alternative authorities.
+remain implementations of this boundary rather than alternative authorities. The
+implemented model/tool/plan/run contract is described in
+[`docs/AI_CONTROL_PLANE.md`](docs/AI_CONTROL_PLANE.md).

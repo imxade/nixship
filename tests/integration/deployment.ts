@@ -18,6 +18,7 @@ process.env.MIN_FREE_DISK_MB = "128";
 process.env.MIN_FREE_MEMORY_MB = "64";
 process.env.SOURCE_POLL_SECONDS = "86400";
 process.env.METRICS_INTERVAL_SECONDS = "2";
+process.env.HOST_ONLY_SECRET_SENTINEL = "must-not-reach-workload";
 
 const [{ PlatformRuntime }, database, appService, environment, ports, processIdentity] =
   await Promise.all([
@@ -57,6 +58,7 @@ try {
     FIXTURE_HASH: "literal # hash",
     FIXTURE_MULTILINE: "first\nsecond",
     FIXTURE_EMPTY: "",
+    HOST_ONLY_SECRET_SENTINEL: null,
   };
   appService.setEnvironment(
     appId,
@@ -145,6 +147,7 @@ FIXTURE_EMPTY=
     JSON.stringify({
       healthyActivation: true,
       dotenvEnvironmentReachedProcess: true,
+      hostEnvironmentSecretExcluded: true,
       failedCandidatePreservedRelease: true,
       queueSuperseding: true,
       recoveredProcessIdentity: true,
@@ -203,6 +206,7 @@ environment_keys = [
     "FIXTURE_HASH",
     "FIXTURE_MULTILINE",
     "FIXTURE_EMPTY",
+    "HOST_ONLY_SECRET_SENTINEL",
 ]
 
 class Handler(http.server.BaseHTTPRequestHandler):

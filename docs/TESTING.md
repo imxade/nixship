@@ -67,7 +67,9 @@ AI unit tests use a deterministic fake provider and cover encrypted transcripts,
 credential rejection before provider access, read-only tool exposure, immutable
 hash approval, stale state, RBAC, strict schemas, resource-key validation,
 idempotent duplicate approval, SSRF-sensitive endpoint policy and verified rename
-execution. Core correctness never depends on a paid provider.
+execution. The protocol under test, including model-visible tools and plan/run
+formats, is documented in [`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md). Core
+correctness never depends on a paid provider.
 
 The Playwright CI admin project uses a loopback OpenAI-compatible fixture to check
 answer-without-plan, masked secure input, action-to-immutable-plan, no mutation

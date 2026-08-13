@@ -23,6 +23,40 @@ interface ManagedProcess {
   identity: ProcessIdentity;
 }
 
+const WORKLOAD_INHERITED_ENVIRONMENT_KEYS = [
+  "ANDROID_DATA",
+  "ANDROID_ROOT",
+  "ANDROID_RUNTIME_ROOT",
+  "ANDROID_TZDATA_ROOT",
+  "HOME",
+  "LANG",
+  "LANGUAGE",
+  "LC_ALL",
+  "LC_COLLATE",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "LC_MONETARY",
+  "LC_NUMERIC",
+  "LC_TIME",
+  "LOCALE_ARCHIVE",
+  "LOCALE_ARCHIVE_2_27",
+  "LOGNAME",
+  "NIX_REMOTE",
+  "NIX_SSL_CERT_FILE",
+  "PATH",
+  "PREFIX",
+  "SHELL",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "TEMP",
+  "TERMUX_VERSION",
+  "TMP",
+  "TMPDIR",
+  "TZ",
+  "TZDIR",
+  "USER",
+] as const;
+
 export class ProcessSupervisor {
   private readonly managed = new Map<string, ManagedProcess>();
   private monitorTimer: NodeJS.Timeout | null = null;
@@ -55,20 +89,22 @@ export class ProcessSupervisor {
     const envRows = getDb()
       .prepare("SELECT key, value_encrypted FROM app_environment WHERE app_id = ?")
       .all(app.id) as Array<{ key: string; value_encrypted: string }>;
-    const env: NodeJS.ProcessEnv = {
-      ...workloadBaseEnvironment(process.env),
-      ...Object.fromEntries(envRows.map((row) => [row.key, decryptSecret(row.value_encrypted)])),
-      MANAGED_DEPLOYMENT: "1",
-      APP_ID: app.id,
-      APP_NAME: app.name,
-      DEPLOYMENT_ID: deployment.id,
-      RELEASE_DIR: releaseDir,
-      DATA_DIR: locations.data,
-      CACHE_DIR: locations.cache,
-      LOG_DIR: locations.logs,
-      HOST: "127.0.0.1",
-      ...(internalPort ? { PORT: String(internalPort) } : {}),
-    };
+    const env = buildWorkloadEnvironment(
+      process.env,
+      Object.fromEntries(envRows.map((row) => [row.key, decryptSecret(row.value_encrypted)])),
+      {
+        MANAGED_DEPLOYMENT: "1",
+        APP_ID: app.id,
+        APP_NAME: app.name,
+        DEPLOYMENT_ID: deployment.id,
+        RELEASE_DIR: releaseDir,
+        DATA_DIR: locations.data,
+        CACHE_DIR: locations.cache,
+        LOG_DIR: locations.logs,
+        HOST: "127.0.0.1",
+        ...(internalPort ? { PORT: String(internalPort) } : {}),
+      },
+    );
     const child = spawnLogged("nix", ["run", "--no-write-lock-file", `.#${app.flake_output}`], {
       cwd: releaseDir,
       env,
@@ -268,9 +304,24 @@ export class ProcessSupervisor {
 export function workloadBaseEnvironment(
   source: Readonly<Record<string, string | undefined>>,
 ): NodeJS.ProcessEnv {
-  return Object.fromEntries(
-    Object.entries(source).filter(([key]) => !key.toUpperCase().startsWith("PLATFORM_")),
-  ) as NodeJS.ProcessEnv;
+  const environment = {} as NodeJS.ProcessEnv;
+  for (const key of WORKLOAD_INHERITED_ENVIRONMENT_KEYS) {
+    const value = source[key];
+    if (value !== undefined) environment[key] = value;
+  }
+  return environment;
+}
+
+export function buildWorkloadEnvironment(
+  inherited: Readonly<Record<string, string | undefined>>,
+  application: Readonly<Record<string, string>>,
+  runtime: Readonly<Record<string, string>>,
+): NodeJS.ProcessEnv {
+  return {
+    ...workloadBaseEnvironment(inherited),
+    ...application,
+    ...runtime,
+  };
 }
 
 function terminateProcessGroup(processGroupId: number, signal: NodeJS.Signals): void {

@@ -94,13 +94,21 @@ For the integrated Android app, replace the local key-file fallback with Android
   expanded-size limits. Extraction rejects traversal, original-name sanitization, symlinks and
   non-regular entries, verifies CRC/digest, and atomically publishes only a complete locked flake.
 - Applications receive a controlled working directory and explicit runtime variables.
-- Control-plane `PLATFORM_*` environment variables, including the master key and
-  optional AI provider key, are removed from the inherited workload environment.
-  Only the documented runtime contract and explicitly stored application variables
-  are added for the workload.
+- Workloads inherit only a reviewed compatibility set needed to launch Nix across
+  supported platforms: basic identity/path, temporary-directory, locale, TLS,
+  selected Nix daemon and Nix-on-Droid variables. Arbitrary host variables,
+  control-plane `PLATFORM_*` values, credential variables, agent sockets and
+  process-injection settings are omitted.
+- Explicitly stored application variables are applied after compatible host values,
+  so an owner may deliberately configure values such as `HOME` or `PATH`. The
+  documented Nix Ship runtime variables are applied last and cannot be overridden.
 - Each application starts in a distinct POSIX process group for group termination.
 
 ## AI planning and execution
+
+The normalized model messages, exposed tool schemas, capability-search descriptors,
+strict plan format and deterministic execution result are documented in
+[`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md).
 
 - The optional planning model receives registered read capabilities only. It has
   no shell, SQL, filesystem, generic HTTP or mutating capability implementation.

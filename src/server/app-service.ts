@@ -5,6 +5,7 @@ import { audit } from "./audit.ts";
 import { encryptSecret } from "./crypto.ts";
 import { getDb, nowIso } from "./db.ts";
 import { replaceApplicationDomainAssignments } from "./domain-assignments.ts";
+import { isReservedApplicationEnvironmentKey } from "./environment.ts";
 import { HttpError } from "./errors.ts";
 import { isValidGitBranchName, remoteDefaultBranch } from "./git.ts";
 import { getHarburConnection, listHarburRepositories } from "./harbur.ts";
@@ -255,10 +256,7 @@ export function setEnvironment(
   for (const [key, value] of entries) {
     if (!/^[A-Z_][A-Z0-9_]*$/i.test(key))
       throw new HttpError(400, `Invalid environment variable name: ${key}`, "invalid_env_key");
-    if (
-      key.startsWith("PLATFORM_") ||
-      ["PORT", "HOST", "DATA_DIR", "CACHE_DIR", "LOG_DIR"].includes(key)
-    ) {
+    if (isReservedApplicationEnvironmentKey(key)) {
       throw new HttpError(400, `${key} is reserved by Nix Ship`, "reserved_env_key");
     }
     if (Buffer.byteLength(value) > 64 * 1024)

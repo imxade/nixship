@@ -87,13 +87,21 @@ user -> model (read tools only) -> proposed canonical plan
      -> exact hash approval -> TypeScript executor -> domain service -> verification
 ```
 
-The model transport exposes a bounded set of typed read capabilities, capability
-search, ordinary/secure input requests and plan proposal. Mutation capabilities
-are registry entries but are never sent to the model as executable tools. Coverage
-includes application/deployment lifecycle, settings, sources, integrations,
-domains, providers/models and managed Ollama. Execution rechecks the current human
-role and captured state, takes sorted resource locks, records stable idempotency
-keys, audits the real user and reports success only after service verification.
+The provider receives a system policy, recent text history, role-filtered read tools
+with JSON Schemas, and four control tools: capability search, ordinary input,
+secure input and strict plan proposal. Mutation descriptors are returned by search
+with their ID, version, risk, roles and input JSON Schema, but their implementations
+are never exposed as callable tools.
+
+The model returns normalized text and/or typed function calls. Read results are
+schema-validated and returned for another bounded model step. A plan call is parsed,
+previewed against the server registry, canonicalized, hashed and persisted; it is
+not executed. Exact approval later reloads the persisted plan. The executor resolves
+each capability by ID/version, rechecks role and state, locks resources, validates
+input/output and verifies the real effect without another model call.
+
+The complete message, tool, plan, approval and run-result formats are documented in
+[`AI_CONTROL_PLANE.md`](AI_CONTROL_PLANE.md).
 
 AI SDK UI transports chat outcomes to the global drawer. Approved work is detached
 from the request and publishes authoritative run-step, deployment and Ollama-pull
