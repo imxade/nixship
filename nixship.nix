@@ -10,7 +10,7 @@ let
     version = "0.1.0";
     src = self;
     pnpm = pkgs.pnpm_10;
-    hash = "sha256-zZi0v+ylsTCQAT41/Coy8cJaChi6YTtDf8zZySoOQB8=";
+    hash = "sha256-VbR/XGXpeA0jh+BeJcBm2SG4uhxojXkmK0FlXSDygpE=";
     fetcherVersion = 3;
   };
 in
