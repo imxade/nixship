@@ -60,11 +60,11 @@
     "@tailwindcss/postcss": "4.3.3",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "24.1.0",
-    "@types/react": "19.2.0",
+    "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
-    "daisyui": "5.6.15",
+    "daisyui": "5.7.16",
     "tailwindcss": "4.3.3",
-    "tsx": "4.20.6",
+    "tsx": "4.23.12",
     "typescript": "5.9.2",
     "vitest": "4.1.10"
   }
