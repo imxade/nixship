@@ -16,7 +16,7 @@ test("custom development server completes the Next.js HMR WebSocket upgrade", as
   });
 
   page.on("websocket", (socket) => {
-    if (!new URL(socket.url()).pathname.startsWith("/_next/webpack-hmr")) return;
+    if (!new URL(socket.url()).pathname.startsWith("/_next/hmr")) return;
     hmrSocket = socket;
     socket.on("framereceived", () => resolveFrame?.());
     socket.on("socketerror", (error) => {
@@ -27,7 +27,7 @@ test("custom development server completes the Next.js HMR WebSocket upgrade", as
 
   await page.goto("/setup");
   await expect(page.getByRole("heading", { name: "Claim this Nix Ship" })).toBeVisible();
-  await expect.poll(() => hmrSocket?.url()).toContain("/_next/webpack-hmr");
+  await expect.poll(() => hmrSocket?.url()).toContain("/_next/hmr");
   await Promise.race([
     receivedFrame,
     new Promise((_, reject) =>
@@ -89,7 +89,7 @@ function quickTunnelHmrUpgrade(
     socket.once("connect", () => {
       socket.write(
         [
-          "GET /_next/webpack-hmr?id=quick-tunnel-regression HTTP/1.1",
+          "GET /_next/hmr?id=quick-tunnel-regression HTTP/1.1",
           `Host: ${hostname}`,
           `Origin: https://${originHostname}`,
           "Connection: Upgrade",
