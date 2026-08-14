@@ -29,6 +29,10 @@ Last updated: 2026-08-14.
   install/select/remove model picker.
 - Node.js 24 is now the consistent development, package-engine and Nix runtime
   baseline.
+- TypeScript 7.0.2 and `@types/node` 26.2.0 are now the pinned compiler and Node
+  API type baselines. Source and server typechecks, the production build,
+  browser flows, deployment integrations and the Nix package all pass with the
+  native compiler release.
 - `nix develop .#ai` and `packages.ollama` supply flake-pinned Ollama. The production
   manager lazily realizes it into a GC root, owns a loopback-only process identity,
   applies low-resource concurrency limits and leaves it outside the base closure.
@@ -105,6 +109,24 @@ Last updated: 2026-08-14.
 - Apache-2.0 licensing with Rituraj Basak recorded as the owner.
 
 ## Validation completed on x86_64 Linux
+
+The TypeScript 7.0.2 and Node 26 type-definition migration was validated on
+2026-08-14:
+
+```text
+pnpm biome:ci
+pnpm typecheck
+pnpm test                       # 34 files, 137 tests
+pnpm build
+pnpm test:e2e                   # Chromium, seven scenarios
+pnpm test:deployment
+pnpm test:examples
+pnpm db:doctor                  # 16 migrations, integrity and FK checks clean
+pnpm security:check
+nix flake check --print-build-logs
+nix build --print-build-logs
+result/bin/nixship              # fresh data, ready health response, clean SIGINT
+```
 
 The multi-deployment and Nix Ship rename work was validated on 2026-08-08:
 
