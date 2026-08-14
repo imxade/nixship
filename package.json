@@ -13,13 +13,6 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "pnpm": {
-    "overrides": {
-      "nanoid": "3.3.18",
-      "postcss": "8.5.23",
-      "sharp": "0.35.0"
-    }
-  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "DISABLE_PLATFORM_RUNTIME=1 next build && tsc -p tsconfig.server.json",
@@ -53,9 +46,9 @@
     "@ai-sdk/openai-compatible": "3.0.29",
     "@ai-sdk/react": "4.0.62",
     "ai": "7.0.59",
-    "better-sqlite3": "13.0.1",
+    "better-sqlite3": "13.0.3",
     "jszip": "3.10.1",
-    "next": "16.2.11",
+    "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tldts": "7.4.10",
@@ -63,12 +56,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.7",
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "4.3.3",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "24.1.0",
     "@types/react": "19.2.0",
-    "@types/react-dom": "19.2.0",
+    "@types/react-dom": "19.2.4",
     "daisyui": "5.6.15",
     "tailwindcss": "4.3.3",
     "tsx": "4.20.6",

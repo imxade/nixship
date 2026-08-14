@@ -29,12 +29,16 @@ security, audit, license, direct-example, real-deployment and Nix package gates
 on x86_64 Linux. Trusted pushes to `master` additionally run the private Harbur
 deployment test. Pull requests never receive its integration token.
 
-NPM Dependabot pull requests receive one mechanical follow-up commit when their
-lockfile changes. The guarded workflow accepts only same-repository Dependabot
-branches that change `package.json` and `pnpm-lock.yaml`, runs
-`pnpm nix:refresh-pnpm-hash`, commits only `nixship.nix`, and explicitly dispatches
-CI for the resulting commit. Compatibility failures remain ordinary blocking CI
-failures; the workflow does not merge or approve dependency updates.
+NPM Dependabot groups routine minor and patch updates into one weekly pull
+request; major updates remain separate. Pull requests receive one mechanical
+follow-up commit when their lockfile changes. The guarded workflow accepts only
+same-repository Dependabot branches that change `package.json` and
+`pnpm-lock.yaml`, runs `pnpm nix:refresh-pnpm-hash`, commits only `nixship.nix`,
+and explicitly dispatches CI for the resulting commit. The generated commit uses
+Dependabot's skip marker so Dependabot can still rebase the branch after another
+dependency pull request merges; synchronization then recalculates the aggregate
+Nix dependency hash. Compatibility failures remain ordinary blocking CI failures;
+the workflow does not merge or approve dependency updates.
 
 Release CI expansion still required:
 

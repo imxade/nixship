@@ -127,7 +127,7 @@ function sanitizeForwardedHeaders(request: http.IncomingMessage): void {
 
 function allowSameOriginQuickTunnelHmr(request: http.IncomingMessage): void {
   if (!development) return;
-  if (requestPath(request.url) !== "/_next/webpack-hmr") return;
+  if (requestPath(request.url) !== "/_next/hmr") return;
   const remoteAddress = request.socket.remoteAddress;
   if (
     remoteAddress !== "127.0.0.1" &&
