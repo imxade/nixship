@@ -3,6 +3,7 @@ import type { AuthenticatedActor } from "../auth.ts";
 import { decryptSecret, encryptSecret } from "../crypto.ts";
 import { getDb, nowIso } from "../db.ts";
 import { HttpError } from "../errors.ts";
+import { aiMaxChatInputBytes, aiMaxMessageBytes } from "./ai-settings.ts";
 import { assertConversationOwner } from "./plans/store.ts";
 
 export type AiMessageRole = "user" | "assistant" | "system";
@@ -167,7 +168,7 @@ export function addMessage(input: {
   modelId?: string | null;
 }): AiMessage {
   assertConversationOwner(input.conversationId, input.actor.id);
-  if (Buffer.byteLength(input.content) > 64 * 1024) {
+  if (Buffer.byteLength(input.content) > aiMaxMessageBytes()) {
     throw new HttpError(413, "AI message is too large", "message_too_large");
   }
   const id = crypto.randomUUID();
@@ -213,7 +214,7 @@ export function deleteConversation(id: string, actor: AuthenticatedActor): void 
 }
 
 export function assertChatTextSafe(text: string): void {
-  if (Buffer.byteLength(text) > 16 * 1024) {
+  if (Buffer.byteLength(text) > aiMaxChatInputBytes()) {
     throw new HttpError(413, "Chat input is too large", "message_too_large");
   }
   const credentialPatterns = [

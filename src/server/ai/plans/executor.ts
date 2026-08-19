@@ -7,6 +7,7 @@ import { errorMessage, HttpError } from "../../errors.ts";
 import { events } from "../../events.ts";
 import { assertCapabilityRole, type CapabilityRegistry } from "../capabilities/registry.ts";
 import type { CapabilityContext } from "../capabilities/types.ts";
+import { aiLockRenewalMs, aiResourceLockTtlMs } from "../ai-settings.ts";
 import { assertFreshAiReauth } from "../reauth.ts";
 import type { ActionPlan, PlanStateSnapshot } from "./schema.ts";
 import { getPlan } from "./store.ts";
@@ -145,7 +146,7 @@ async function executeRun(
   try {
     acquireLocks(runId, resourceKeys);
     locksAcquired = true;
-    lockRenewalTimer = setInterval(() => renewLocks(runId), 60_000);
+    lockRenewalTimer = setInterval(() => renewLocks(runId), aiLockRenewalMs());
     lockRenewalTimer.unref();
     setRunState(runId, "running");
     events.publish("ai.run.started", `ai-run:${runId}`, { runId });
@@ -280,7 +281,7 @@ async function checkPlanPreconditions(
 
 function acquireLocks(runId: string, resourceKeys: string[]): void {
   const now = nowIso();
-  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + aiResourceLockTtlMs()).toISOString();
   try {
     getDb().transaction(() => {
       getDb().prepare("DELETE FROM ai_resource_locks WHERE expires_at <= ?").run(now);
@@ -302,7 +303,7 @@ function acquireLocks(runId: string, resourceKeys: string[]): void {
 }
 
 export function renewLocks(runId: string): void {
-  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + aiResourceLockTtlMs()).toISOString();
   try {
     getDb()
       .prepare("UPDATE ai_resource_locks SET expires_at = ? WHERE run_id = ?")

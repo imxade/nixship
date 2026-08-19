@@ -3,6 +3,7 @@ import type { AuthenticatedActor } from "../auth.ts";
 import { decryptSecret, encryptSecret, randomToken } from "../crypto.ts";
 import { getDb, nowIso } from "../db.ts";
 import { HttpError } from "../errors.ts";
+import { aiSecretRefTtlMs } from "./ai-settings.ts";
 
 export const aiSecretKindSchema = z.enum([
   "cloudflare_api_token",
@@ -53,7 +54,7 @@ export function createAiSecretReference(input: {
   }
   const id = `aisec_${randomToken(18)}`;
   const now = nowIso();
-  const expiresAt = new Date(Date.now() + (input.ttlMs ?? 30 * 60_000)).toISOString();
+  const expiresAt = new Date(Date.now() + (input.ttlMs ?? aiSecretRefTtlMs())).toISOString();
   getDb()
     .prepare(
       `INSERT INTO ai_secret_refs(

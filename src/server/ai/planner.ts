@@ -2,6 +2,15 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import type { AuthenticatedActor } from "../auth.ts";
 import { HttpError } from "../errors.ts";
+import {
+  aiCapabilitySearchLimit,
+  aiConversationHistoryLimit,
+  aiMaxModelSteps,
+  aiMaxPendingPlanners,
+  aiMaxSimultaneousReads,
+  aiPlanExpiryMs,
+  aiReadToolsLimit,
+} from "./ai-settings.ts";
 import { aiCapabilities } from "./capabilities/index.ts";
 import { assertCapabilityRole } from "./capabilities/registry.ts";
 import type { CapabilityContext } from "./capabilities/types.ts";
@@ -22,9 +31,7 @@ import {
   type ProviderTool,
 } from "./provider.ts";
 
-const MAX_MODEL_STEPS = 6;
-const MAX_SIMULTANEOUS_READS = 4;
-const MAX_PENDING_PLANNERS = 8;
+
 let plannerActive = false;
 const plannerWaiters: Array<(release: () => void) => void> = [];
 
@@ -97,7 +104,7 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
     actor: input.actor,
     requestId: input.requestId ?? crypto.randomUUID(),
   };
-  const history = listMessages(input.conversationId, input.actor, 20);
+  const history = listMessages(input.conversationId, input.actor, aiConversationHistoryLimit());
   addMessage({
     conversationId: input.conversationId,
     actor: input.actor,
@@ -106,7 +113,7 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
     content: input.text,
   });
 
-  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + aiPlanExpiryMs()).toISOString();
   const messages: ProviderMessage[] = [
     {
       role: "system",
@@ -125,7 +132,7 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
   const toolEntries = plannerTools(input.actor);
   const tools = toolEntries.map((entry) => entry.definition);
 
-  for (let stepIndex = 0; stepIndex < MAX_MODEL_STEPS; stepIndex++) {
+  for (let stepIndex = 0; stepIndex < aiMaxModelSteps(); stepIndex++) {
     const response = await provider.complete(messages, tools);
     if (response.toolCalls.length === 0) {
       const content = response.content?.trim();
@@ -195,7 +202,7 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
       return { type: "plan", content, plan };
     }
 
-    if (response.toolCalls.length > MAX_SIMULTANEOUS_READS) {
+    if (response.toolCalls.length > aiMaxSimultaneousReads()) {
       throw new HttpError(502, "AI requested too many read tools at once", "ai_tool_budget");
     }
     messages.push({
@@ -228,7 +235,7 @@ function acquirePlannerSlot(): Promise<() => void> {
     plannerActive = true;
     return Promise.resolve(createPlannerRelease());
   }
-  if (plannerWaiters.length >= MAX_PENDING_PLANNERS) {
+  if (plannerWaiters.length >= aiMaxPendingPlanners()) {
     throw new HttpError(429, "The AI planner queue is full", "ai_planner_busy", 1);
   }
   return new Promise((resolve) => plannerWaiters.push(resolve));
@@ -254,7 +261,7 @@ function plannerTools(actor: AuthenticatedActor): PlannerToolEntry[] {
   const registry = aiCapabilities();
   const entries: PlannerToolEntry[] = registry
     .descriptors({ role: actor.role, readOnly: true })
-    .slice(0, 20)
+    .slice(0, aiReadToolsLimit())
     .map((descriptor) => {
       const capability = registry.get(descriptor.id);
       return {
@@ -296,7 +303,7 @@ function plannerTools(actor: AuthenticatedActor): PlannerToolEntry[] {
       return registry
         .descriptors({ query: input.query, role: actor.role })
         .filter((descriptor) => descriptor.risk !== "read")
-        .slice(0, 16);
+        .slice(0, aiCapabilitySearchLimit());
     },
   });
   entries.push({
