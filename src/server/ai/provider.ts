@@ -6,6 +6,7 @@ import { config } from "../config.ts";
 import { decryptSecret } from "../crypto.ts";
 import { getDb, setting } from "../db.ts";
 import { HttpError } from "../errors.ts";
+import { aiProviderResponseMaxBytes } from "./ai-settings.ts";
 
 export interface ProviderMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -110,7 +111,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 function secureProviderFetch(fetchImplementation: typeof fetch): typeof fetch {
   return async (input, init) => {
     const response = await fetchImplementation(input, { ...init, redirect: "error" });
-    const body = await readBoundedProviderResponse(response, 1024 * 1024);
+    const body = await readBoundedProviderResponse(response, aiProviderResponseMaxBytes());
     return new Response(Uint8Array.from(body), {
       status: response.status,
       statusText: response.statusText,

@@ -271,10 +271,41 @@ export async function prepareHarburRelease(
   const endpoint = `/api/integrations/v1/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(
     repositoryName,
   )}/snapshots/${revision}`;
-  const response = await harburFetch(connection, endpoint, true, signal);
+  let response = await harburFetch(connection, endpoint, true, signal, "manual");
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new HttpError(
+        502,
+        "Harbur snapshot redirect missing location header",
+        "harbur_redirect",
+      );
+    }
+    const redirectUrl = new URL(location, new URL(endpoint, `${connection.base_url}/`));
+    if (redirectUrl.protocol !== "https:" && redirectUrl.protocol !== "http:") {
+      throw new HttpError(502, "Harbur snapshot redirect must use HTTPS", "harbur_redirect");
+    }
+    const declaredDigest = response.headers.get("x-content-sha256")?.toLowerCase();
+    if (declaredDigest && declaredDigest !== revision) {
+      throw new HttpError(502, "Harbur returned an unexpected snapshot digest", "harbur_digest");
+    }
+    const timeout = AbortSignal.timeout(60_000);
+    const combinedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const baseOrigin = new URL(connection.base_url).origin;
+    const isSameOrigin = redirectUrl.origin === baseOrigin;
+    const token = connection.token_encrypted ? decryptSecret(connection.token_encrypted) : null;
+    response = await fetch(redirectUrl, {
+      redirect: "follow",
+      signal: combinedSignal,
+      headers: {
+        Referer: `${baseOrigin}/`,
+        ...(isSameOrigin && token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  }
   if (!response.ok) await throwHarburResponse(response);
   const declaredDigest = response.headers.get("x-content-sha256")?.toLowerCase();
-  if (declaredDigest !== revision) {
+  if (declaredDigest && declaredDigest !== revision) {
     throw new HttpError(502, "Harbur returned an unexpected snapshot digest", "harbur_digest");
   }
   const archive = await readBoundedResponse(response, MAX_ARCHIVE_BYTES);
@@ -374,6 +405,7 @@ async function harburFetch(
   endpoint: string,
   authenticated: boolean,
   signal?: AbortSignal,
+  redirect: "error" | "manual" = "error",
 ) {
   const base = new URL(connection.base_url);
   await normalizeHarburBaseUrl(connection.base_url, Boolean(connection.allow_private_network));
@@ -384,7 +416,7 @@ async function harburFetch(
   const token =
     authenticated && connection.token_encrypted ? decryptSecret(connection.token_encrypted) : null;
   return fetch(url, {
-    redirect: "error",
+    redirect,
     signal: combinedSignal,
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });

@@ -1,4 +1,5 @@
 import { HttpError } from "../../errors.ts";
+import { aiMaxPlanLifetimeMs } from "../ai-settings.ts";
 import { assertCapabilityRole, type CapabilityRegistry } from "../capabilities/registry.ts";
 import type { CapabilityContext, CapabilityRisk } from "../capabilities/types.ts";
 import { canonicalHash } from "./canonicalize.ts";
@@ -10,7 +11,6 @@ import {
 } from "./schema.ts";
 
 const RESOURCE_KEY = /^[a-z][a-z0-9-]*:[A-Za-z0-9._:@/-]{1,256}$/;
-const MAX_PLAN_LIFETIME_MS = 30 * 60_000;
 
 export interface ValidatedPlan {
   plan: ActionPlan;
@@ -29,7 +29,7 @@ export async function validatePlan(
   if (
     !Number.isFinite(expiry) ||
     expiry <= Date.now() ||
-    expiry > Date.now() + MAX_PLAN_LIFETIME_MS
+    expiry > Date.now() + aiMaxPlanLifetimeMs()
   ) {
     throw new HttpError(
       400,

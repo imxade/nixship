@@ -2,8 +2,7 @@ import { audit } from "../audit.ts";
 import { type AuthenticatedActor, verifyCurrentPassword } from "../auth.ts";
 import { getDb, nowIso } from "../db.ts";
 import { HttpError } from "../errors.ts";
-
-const REAUTH_TTL_MS = 5 * 60_000;
+import { aiReauthTtlMs } from "./ai-settings.ts";
 
 export async function createAiReauthGrant(
   actor: AuthenticatedActor,
@@ -21,7 +20,7 @@ export async function createAiReauthGrant(
     throw new HttpError(401, "Current password is incorrect", "reauth_failed");
   }
   const now = nowIso();
-  const expiresAt = new Date(Date.now() + REAUTH_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.now() + aiReauthTtlMs()).toISOString();
   getDb()
     .prepare(
       `INSERT INTO ai_reauth_grants(session_id, user_id, verified_at, expires_at)
