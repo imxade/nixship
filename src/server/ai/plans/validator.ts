@@ -1,7 +1,7 @@
 import { HttpError } from "../../errors.ts";
+import { aiMaxPlanLifetimeMs } from "../ai-settings.ts";
 import { assertCapabilityRole, type CapabilityRegistry } from "../capabilities/registry.ts";
 import type { CapabilityContext, CapabilityRisk } from "../capabilities/types.ts";
-import { aiMaxPlanLifetimeMs } from "../ai-settings.ts";
 import { canonicalHash } from "./canonicalize.ts";
 import {
   type ActionPlan,

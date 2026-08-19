@@ -43,7 +43,13 @@ const fields: Array<{
     min: 1,
     max: 16,
   },
-  { key: "readToolsLimit", label: "Read tools exposed to model", group: "Planner", min: 5, max: 40 },
+  {
+    key: "readToolsLimit",
+    label: "Read tools exposed to model",
+    group: "Planner",
+    min: 5,
+    max: 40,
+  },
   {
     key: "capabilitySearchLimit",
     label: "Capability search results",

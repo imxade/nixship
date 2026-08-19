@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { type AiSettings, getAiSettings, updateAiSettings } from "@/server/ai/ai-settings";
 import { requireRole } from "@/server/auth";
-import { getAiSettings, updateAiSettings, type AiSettings } from "@/server/ai/ai-settings";
 import { api, readJson } from "@/server/http";
 import { clientIp, requestUser } from "@/server/next-auth";
 

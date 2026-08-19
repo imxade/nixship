@@ -31,7 +31,6 @@ import {
   type ProviderTool,
 } from "./provider.ts";
 
-
 let plannerActive = false;
 const plannerWaiters: Array<(release: () => void) => void> = [];
 

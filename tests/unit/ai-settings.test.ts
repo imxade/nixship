@@ -66,10 +66,7 @@ describe("AI settings defaults", () => {
 
 describe("AI settings persistence", () => {
   it("persists and reads back updated values", () => {
-    aiSettings.updateAiSettings(
-      { maxModelSteps: 10, maxPendingPlanners: 4 },
-      { id: owner.id },
-    );
+    aiSettings.updateAiSettings({ maxModelSteps: 10, maxPendingPlanners: 4 }, { id: owner.id });
     expect(aiSettings.aiMaxModelSteps()).toBe(10);
     expect(aiSettings.aiMaxPendingPlanners()).toBe(4);
     // Unchanged values retain defaults
@@ -83,27 +80,21 @@ describe("AI settings persistence", () => {
       .prepare("SELECT * FROM audit_events WHERE action = 'settings.ai_settings_updated'")
       .all() as Array<{ details_json: string }>;
     expect(audit.length).toBe(1);
-    const details = JSON.parse(audit[0]!.details_json);
+    const details = JSON.parse(audit[0]?.details_json ?? "{}");
     expect(details.planExpiryMinutes).toBe(15);
   });
 });
 
 describe("AI settings validation", () => {
   it("rejects out-of-range values", () => {
-    expect(() =>
-      aiSettings.updateAiSettings({ maxModelSteps: 100 }, { id: owner.id }),
-    ).toThrow();
-    expect(() =>
-      aiSettings.updateAiSettings({ maxModelSteps: 0 }, { id: owner.id }),
-    ).toThrow();
+    expect(() => aiSettings.updateAiSettings({ maxModelSteps: 100 }, { id: owner.id })).toThrow();
+    expect(() => aiSettings.updateAiSettings({ maxModelSteps: 0 }, { id: owner.id })).toThrow();
     // Value should remain at default
     expect(aiSettings.aiMaxModelSteps()).toBe(6);
   });
 
   it("rejects negative values", () => {
-    expect(() =>
-      aiSettings.updateAiSettings({ reauthTtlMinutes: -5 }, { id: owner.id }),
-    ).toThrow();
+    expect(() => aiSettings.updateAiSettings({ reauthTtlMinutes: -5 }, { id: owner.id })).toThrow();
   });
 
   it("falls back to default for corrupted stored values", () => {
@@ -131,10 +122,7 @@ describe("AI settings derived values", () => {
 
 describe("AI settings bulk operations", () => {
   it("getAiSettings returns all settings after partial update", () => {
-    aiSettings.updateAiSettings(
-      { maxModelSteps: 8, reauthTtlMinutes: 10 },
-      { id: owner.id },
-    );
+    aiSettings.updateAiSettings({ maxModelSteps: 8, reauthTtlMinutes: 10 }, { id: owner.id });
     const all = aiSettings.getAiSettings();
     expect(all.maxModelSteps).toBe(8);
     expect(all.reauthTtlMinutes).toBe(10);
