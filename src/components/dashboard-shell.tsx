@@ -12,6 +12,7 @@ const items = [
   ["/integrations/github", "GitHub", "github"],
   ["/integrations/harbur", "Harbur", "harbur"],
   ["/integrations/cloudflare", "Cloudflare", "cloud"],
+  ["/ai", "AI", "ai"],
   ["/users", "Users", "users"],
   ["/account", "Account", "account"],
   ["/system", "System", "system"],
@@ -130,6 +131,9 @@ function NavIcon({ name }: { name: NavIconName }) {
       </>
     ),
     cloud: <path d="M17.5 19H6a4 4 0 0 1-.5-8A6.5 6.5 0 0 1 18 9a5 5 0 0 1-.5 10Z" />,
+    ai: (
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+    ),
     users: (
       <>
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />

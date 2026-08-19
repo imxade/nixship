@@ -2,7 +2,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { apiFetch, formatBytes } from "@/lib/client-api";
 import { type AccessLink, AccessLinks } from "./access-links";
-import { AiSettingsCard } from "./ai-settings-card";
 import { PageHeading } from "./page-heading";
 import { QuickTunnelNotice, type QuickTunnelState } from "./quick-tunnel-notice";
 
@@ -165,7 +164,6 @@ export function SystemClient() {
               </form>
             </div>
           </section>
-          <AiSettingsCard />
           <div className="grid min-w-0 gap-5 lg:grid-cols-2">
             <div className="card min-w-0 overflow-hidden border border-base-300 bg-base-100">
               <div className="card-body">
