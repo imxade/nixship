@@ -139,9 +139,9 @@ describe("persisted AI provider registry", () => {
     const configured = await providers.configureAiProvider(actor, {
       type: "anthropic",
       name: "Anthropic Claude",
-      baseUrl: "https://api.anthropic.com/v1",
+      baseUrl: "https://127.0.0.1:8443/v1",
       secretRef: null,
-      allowPrivateNetwork: false,
+      allowPrivateNetwork: true,
       timeoutSeconds: 60,
       maxOutputTokens: 2048,
       models: [
