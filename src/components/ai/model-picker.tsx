@@ -39,11 +39,9 @@ interface ModelInventory {
 export function ModelPicker({
   conversationId,
   disabled,
-  onCommand,
 }: {
   conversationId: string | null;
   disabled: boolean;
-  onCommand: (text: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -198,9 +196,6 @@ export function ModelPicker({
       setRemoving(null);
     }
   }
-
-  // Keep onCommand reference alive to avoid lint warnings
-  void onCommand;
 
   return (
     <div className="relative">

@@ -400,7 +400,7 @@ export function AssistantDrawer() {
             </label>
             <div className="mt-2 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <ModelPicker conversationId={conversationId} disabled={busy} onCommand={sendText} />
+                <ModelPicker conversationId={conversationId} disabled={busy} />
                 <span className="block text-xs text-base-content/55">
                   Never paste passwords or API tokens into chat.
                 </span>
