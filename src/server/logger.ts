@@ -24,14 +24,13 @@ export const logger = {
   warn: (message: string, context?: Context) => write("warn", message, context),
   error: (message: string, context?: Context) => write("error", message, context),
   setupBanner: (entries: Array<{ label: string; url: string }>) => {
-    const lines = [
-      "",
-      "╭─ NIX SHIP FIRST-RUN SETUP ────────────────────────────────────────",
-    ];
+    const lines = ["", "╭─ NIX SHIP FIRST-RUN SETUP ────────────────────────────────────────"];
     for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (!entry) continue;
       if (i > 0) lines.push("│");
-      lines.push(`│ ${entries[i]!.label}`);
-      lines.push(`│ ${entries[i]!.url}`);
+      lines.push(`│ ${entry.label}`);
+      lines.push(`│ ${entry.url}`);
     }
     lines.push("╰────────────────────────────────────────────────────────────────────");
     lines.push("");

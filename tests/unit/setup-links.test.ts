@@ -73,10 +73,7 @@ describe("first-run setup banner", () => {
   it("Quick Tunnel claim URL reuses the same first-run token", () => {
     const token = "shared_token_42";
     const lanClaim = firstRunSetupUrl("http://192.168.1.5:3000", token);
-    const tunnelClaim = firstRunSetupUrl(
-      "https://example-tunnel.trycloudflare.com",
-      token,
-    );
+    const tunnelClaim = firstRunSetupUrl("https://example-tunnel.trycloudflare.com", token);
     expect(lanClaim).toContain(`token=${token}`);
     expect(tunnelClaim).toContain(`token=${token}`);
     expect(tunnelClaim).toBe(

@@ -45,9 +45,10 @@ function addQuickTunnelEntries(): boolean {
     .status()
     .routes.find((candidate) => candidate.targetType === "dashboard");
   if (!route?.running || !route.url) return false;
-  if (setupEntries.some((entry) => entry.url.startsWith(route.url!))) return false;
-  setupEntries.push({ label: "QUICK TUNNEL", url: route.url });
-  setupEntries.push({ label: "CLAIM", url: firstRunSetupUrl(route.url, token) });
+  const tunnelUrl = route.url;
+  if (setupEntries.some((entry) => entry.url.startsWith(tunnelUrl))) return false;
+  setupEntries.push({ label: "QUICK TUNNEL", url: tunnelUrl });
+  setupEntries.push({ label: "CLAIM", url: firstRunSetupUrl(tunnelUrl, token) });
   return true;
 }
 
