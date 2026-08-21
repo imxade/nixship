@@ -22,25 +22,38 @@ try {
   await app.close().catch(() => undefined);
   throw error;
 }
-const loggedSetupOrigins = new Set<string>();
+const setupEntries: Array<{ label: string; url: string }> = [];
 
-function logSetupLink(label: string, baseUrl: string): void {
+function printSetupBanner(): void {
   const token = currentSetupToken();
-  if (!token || loggedSetupOrigins.has(baseUrl)) return;
-  loggedSetupOrigins.add(baseUrl);
-  logger.setupLink(label, firstRunSetupUrl(baseUrl, token));
+  if (!token || setupEntries.length === 0) return;
+  logger.setupBanner(setupEntries);
 }
 
-function logDashboardQuickSetupLink(): void {
+function addSetupEntry(label: string, baseUrl: string): boolean {
+  const token = currentSetupToken();
+  if (!token) return false;
+  if (setupEntries.some((entry) => entry.url.startsWith(baseUrl))) return false;
+  setupEntries.push({ label, url: firstRunSetupUrl(baseUrl, token) });
+  return true;
+}
+
+function addQuickTunnelEntries(): boolean {
+  const token = currentSetupToken();
+  if (!token) return false;
   const route = platformRuntime.quickTunnels
     .status()
     .routes.find((candidate) => candidate.targetType === "dashboard");
-  if (route?.running && route.url) logSetupLink("Quick Tunnel", route.url);
+  if (!route?.running || !route.url) return false;
+  if (setupEntries.some((entry) => entry.url.startsWith(route.url!))) return false;
+  setupEntries.push({ label: "QUICK TUNNEL", url: route.url });
+  setupEntries.push({ label: "CLAIM", url: firstRunSetupUrl(route.url, token) });
+  return true;
 }
 
 const unsubscribeEvents = events.subscribe((event) => {
   if (event.type === "quick_tunnel.ready" && event.scope === "system") {
-    logDashboardQuickSetupLink();
+    if (addQuickTunnelEntries()) printSetupBanner();
   }
 });
 
@@ -95,7 +108,7 @@ server.listen(config.PORT, config.HOSTNAME, () => {
   const loopback = ["127.0.0.1", "::1", "localhost"].includes(config.HOSTNAME);
   const lanUrls = loopback ? [] : lanHttpUrls(config.PORT);
   if (lanUrls.length > 0) {
-    for (const url of lanUrls) logSetupLink("LAN", url);
+    for (const url of lanUrls) addSetupEntry("LAN", url);
   } else {
     const configuredHost =
       config.HOSTNAME === "0.0.0.0"
@@ -105,9 +118,10 @@ server.listen(config.PORT, config.HOSTNAME, () => {
           : config.HOSTNAME.includes(":")
             ? `[${config.HOSTNAME}]`
             : config.HOSTNAME;
-    logSetupLink("Local", `http://${configuredHost}:${config.PORT}`);
+    addSetupEntry("Local", `http://${configuredHost}:${config.PORT}`);
   }
-  logDashboardQuickSetupLink();
+  addQuickTunnelEntries();
+  printSetupBanner();
 });
 
 function sanitizeForwardedHeaders(request: http.IncomingMessage): void {

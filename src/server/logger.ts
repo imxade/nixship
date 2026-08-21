@@ -23,16 +23,18 @@ export const logger = {
   info: (message: string, context?: Context) => write("info", message, context),
   warn: (message: string, context?: Context) => write("warn", message, context),
   error: (message: string, context?: Context) => write("error", message, context),
-  setupLink: (label: string, url: string) => {
-    console.log(
-      [
-        "",
-        "╭─ NIX SHIP FIRST-RUN SETUP ────────────────────────────────────────",
-        `│ ${label}`,
-        `│ ${url}`,
-        "╰────────────────────────────────────────────────────────────────────",
-        "",
-      ].join("\n"),
-    );
+  setupBanner: (entries: Array<{ label: string; url: string }>) => {
+    const lines = [
+      "",
+      "╭─ NIX SHIP FIRST-RUN SETUP ────────────────────────────────────────",
+    ];
+    for (let i = 0; i < entries.length; i++) {
+      if (i > 0) lines.push("│");
+      lines.push(`│ ${entries[i]!.label}`);
+      lines.push(`│ ${entries[i]!.url}`);
+    }
+    lines.push("╰────────────────────────────────────────────────────────────────────");
+    lines.push("");
+    console.log(lines.join("\n"));
   },
 };
