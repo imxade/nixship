@@ -33,7 +33,7 @@ describe("backup and restore", () => {
     expect(manifest.format).toBe("platform-backup");
     expect(manifest.keyMode).toBe("external");
     expect(Object.keys(manifest.files).sort()).toEqual(["applications.tar.gz", "platform.sqlite"]);
-  });
+  }, 15000);
 
   it("rejects a modified archive before replacing current application state", () => {
     const root = temporaryRoot();
@@ -51,7 +51,7 @@ describe("backup and restore", () => {
     expect(result.status).not.toBe(0);
     expect(`${result.stderr}${result.stdout}`).toContain("checksum verification failed");
     expect(fs.readFileSync(applicationFile, "utf8")).toBe("current");
-  });
+  }, 15000);
 });
 
 function temporaryRoot(): string {

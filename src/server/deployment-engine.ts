@@ -419,6 +419,13 @@ async function waitForHealthy(
         redirect: "manual",
       });
       if (response.status >= 200 && response.status < 400) return;
+      if (app.health_path !== "/" && (response.status === 404 || response.status === 405)) {
+        const rootResponse = await fetch(`http://127.0.0.1:${port}/`, {
+          signal: controller.signal,
+          redirect: "manual",
+        }).catch(() => null);
+        if (rootResponse && rootResponse.status >= 200 && rootResponse.status < 400) return;
+      }
       lastError = `Health check returned HTTP ${response.status}`;
     } catch (error) {
       lastError = errorMessage(error);

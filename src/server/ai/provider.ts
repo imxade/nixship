@@ -50,11 +50,16 @@ export class OpenAiCompatibleProvider implements AiProvider {
       maxOutputTokens?: number;
       disableReasoning?: boolean;
       fetchImplementation?: typeof fetch;
+      plannerProbeBypass?: boolean;
     },
   ) {}
 
   get modelId(): string {
     return this.options.modelId;
+  }
+
+  get plannerProbeBypass(): boolean | undefined {
+    return this.options.plannerProbeBypass;
   }
 
   async complete(messages: ProviderMessage[], tools: ProviderTool[]): Promise<ProviderResponse> {
@@ -79,7 +84,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         allowSystemInMessages: true,
         tools: toSdkTools(tools),
         temperature: 0,
-        maxOutputTokens: this.options.maxOutputTokens ?? 768,
+        maxOutputTokens: this.options.maxOutputTokens ?? 2048,
         maxRetries: 0,
         timeout: this.options.timeoutMs ?? 60_000,
       });
@@ -191,6 +196,12 @@ function toModelMessages(messages: ProviderMessage[]): ModelMessage[] {
     if (!toolName) {
       throw new HttpError(500, "Tool result has no matching tool call", "invalid_tool_message");
     }
+    let outputValue: unknown;
+    try {
+      outputValue = JSON.parse(message.content);
+    } catch {
+      outputValue = message.content;
+    }
     return {
       role: "tool",
       content: [
@@ -198,7 +209,7 @@ function toModelMessages(messages: ProviderMessage[]): ModelMessage[] {
           type: "tool-result",
           toolCallId,
           toolName,
-          output: { type: "text", value: message.content },
+          output: { type: "json", value: outputValue as any },
         },
       ],
     };

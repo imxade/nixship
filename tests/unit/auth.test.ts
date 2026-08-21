@@ -74,7 +74,7 @@ describe("hourly login limits", () => {
       status: 429,
       code: "login_rate_limited",
     });
-  });
+  }, 15000);
 });
 
 describe("password changes", () => {

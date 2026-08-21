@@ -61,8 +61,34 @@ import type { Capability, CapabilityContext } from "./types.ts";
 
 const allRoles = ["owner", "admin", "operator", "viewer"] as const;
 const operatorRoles = ["owner", "admin", "operator"] as const;
-const emptyInput = z.object({}).strict();
-const appIdInput = z.object({ appId: z.string().uuid() }).strict();
+function resolveAppId(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const trimmed = value.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const exact = getDb()
+      .prepare("SELECT id FROM applications WHERE id = ? OR name = ? OR slug = ? COLLATE NOCASE")
+      .get(trimmed, trimmed, trimmed) as { id: string } | undefined;
+    if (exact) return exact.id;
+
+    const partial = getDb()
+      .prepare("SELECT id FROM applications WHERE name LIKE ? OR slug LIKE ? COLLATE NOCASE")
+      .all(`%${trimmed}%`, `%${trimmed}%`) as Array<{ id: string }>;
+    if (partial.length === 1 && partial[0]?.id) return partial[0].id;
+
+    const allApps = getDb().prepare("SELECT id FROM applications").all() as Array<{ id: string }>;
+    if (allApps.length === 1 && allApps[0]?.id) return allApps[0].id;
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+const appIdSchema = z.preprocess(resolveAppId, z.string().uuid("Invalid application ID"));
+const emptyInput = z.object({}).passthrough();
+const appIdInput = z.object({ appId: appIdSchema }).passthrough();
 
 function readCapability<TInput, TOutput>(input: {
   id: string;
@@ -617,7 +643,12 @@ export function createCapabilityRegistry(): CapabilityRegistry {
       inputSchema: z
         .object({
           repositoryUrl: z.string().trim().url().max(2048),
-          branch: z.string().trim().min(1).max(200).optional(),
+          branch: z
+            .preprocess(
+              (val) => (val === null || val === "" ? undefined : val),
+              z.string().trim().min(1).max(200).optional(),
+            )
+            .optional(),
         })
         .strict(),
       inputJsonSchema: {
@@ -820,14 +851,19 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     }),
   );
 
+  const flakeOutputSchema = z.preprocess(
+    (value) => {
+      if (typeof value !== "string" || !value.trim()) return "default";
+      const cleaned = value.trim().replace(/^#/, "").replace(/\.nix$/, "");
+      return /^[A-Za-z0-9._+-]+$/.test(cleaned) ? cleaned : "default";
+    },
+    z.string().regex(/^[A-Za-z0-9._+-]+$/).default("default"),
+  );
+
   const commonCreateFields = {
     name: z.string().trim().min(1).max(80),
     kind: z.enum(["web", "worker"]).default("web"),
-    flakeOutput: z
-      .string()
-      .trim()
-      .regex(/^[A-Za-z0-9._+-]+$/)
-      .default("default"),
+    flakeOutput: flakeOutputSchema,
     autoDeploy: z.boolean().default(true),
     healthPath: z.string().trim().startsWith("/").max(500).default("/"),
   };
@@ -920,10 +956,19 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     },
     async preview(_ctx, input) {
       if (input.sourceProvider === "github") {
-        const inspection = await inspectPublicGitHubRepository({
+        let inspection = await inspectPublicGitHubRepository({
           repositoryUrl: input.repositoryUrl,
           branch: input.branch,
         });
+        if (!inspection.deployable && input.branch) {
+          const defaultInspection = await inspectPublicGitHubRepository({
+            repositoryUrl: input.repositoryUrl,
+          });
+          if (defaultInspection.deployable) {
+            inspection = defaultInspection;
+            input.branch = defaultInspection.branch;
+          }
+        }
         if (!inspection.deployable) {
           throw new HttpError(
             409,
@@ -960,6 +1005,20 @@ export function createCapabilityRegistry(): CapabilityRegistry {
       };
     },
     async execute(ctx, input, meta) {
+      if (input.sourceProvider === "github" && input.branch) {
+        const inspection = await inspectPublicGitHubRepository({
+          repositoryUrl: input.repositoryUrl,
+          branch: input.branch,
+        });
+        if (!inspection.deployable) {
+          const defaultInspection = await inspectPublicGitHubRepository({
+            repositoryUrl: input.repositoryUrl,
+          });
+          if (defaultInspection.deployable) {
+            input.branch = defaultInspection.branch;
+          }
+        }
+      }
       const app = await createApplication(input, { id: ctx.actor.id });
       const revision = app.source_provider === "harbur" ? await latestHarburRevision(app) : null;
       const deployment = queueDeployment(app.id, {
@@ -995,8 +1054,8 @@ export function createCapabilityRegistry(): CapabilityRegistry {
   });
 
   const assignDomainInput = z
-    .object({ appId: z.string().uuid(), hostname: z.string().trim().min(1).max(253) })
-    .strict();
+    .object({ appId: appIdSchema, hostname: z.string().trim().min(1).max(253) })
+    .passthrough();
   registry.register({
     id: "cloudflare.assignAppDomain",
     version: 1,
@@ -1534,10 +1593,18 @@ export function createCapabilityRegistry(): CapabilityRegistry {
       id: "apps.get",
       title: "Get application",
       description: "Read one application's non-secret settings and environment-key metadata.",
-      inputSchema: appIdInput,
+      inputSchema: z
+        .object({
+          appId: appIdSchema,
+          revealCiphertext: z.boolean().default(false),
+        })
+        .passthrough(),
       inputJsonSchema: {
         type: "object",
-        properties: { appId: { type: "string", format: "uuid" } },
+        properties: {
+          appId: { type: "string", format: "uuid" },
+          revealCiphertext: { type: "boolean" },
+        },
         required: ["appId"],
         additionalProperties: false,
       },
@@ -1831,9 +1898,9 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     }),
   );
 
-  const updateNameInput = z
-    .object({ appId: z.string().uuid(), name: z.string().trim().min(1).max(80) })
-    .strict();
+  const updateAppNameInput = z
+    .object({ appId: appIdSchema, name: z.string().trim().min(1).max(80) })
+    .passthrough();
   registry.register({
     id: "apps.updateName",
     version: 1,
@@ -1842,7 +1909,7 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     risk: "mutation",
     mutates: true,
     requiredRoles: [...operatorRoles],
-    inputSchema: updateNameInput,
+    inputSchema: updateAppNameInput,
     outputSchema: z.object({ id: z.string(), name: z.string(), updatedAt: z.string() }),
     inputJsonSchema: {
       type: "object",
@@ -1887,7 +1954,7 @@ export function createCapabilityRegistry(): CapabilityRegistry {
 
   const updateSettingsInput = z
     .object({
-      appId: z.string().uuid(),
+      appId: appIdSchema,
       branch: z.string().trim().min(1).max(200).optional(),
       flakeOutput: z
         .string()
@@ -1896,7 +1963,6 @@ export function createCapabilityRegistry(): CapabilityRegistry {
         .optional(),
       autoDeploy: z.boolean().optional(),
       healthPath: z.string().trim().startsWith("/").max(500).optional(),
-      restartPolicy: z.enum(["never", "on-failure", "always", "unless-stopped"]).optional(),
     })
     .strict()
     .refine(
@@ -1907,8 +1973,7 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     id: "apps.updateSettings",
     version: 1,
     title: "Update application settings",
-    description:
-      "Update a production branch, flake output, auto-deploy, health path, or restart policy.",
+    description: "Update a production branch, flake output, auto-deploy, or health path.",
     risk: "mutation",
     mutates: true,
     requiredRoles: [...operatorRoles],
@@ -1922,7 +1987,6 @@ export function createCapabilityRegistry(): CapabilityRegistry {
         flakeOutput: { type: "string" },
         autoDeploy: { type: "boolean" },
         healthPath: { type: "string" },
-        restartPolicy: { enum: ["never", "on-failure", "always", "unless-stopped"] },
       },
       required: ["appId"],
       additionalProperties: false,
@@ -1959,13 +2023,67 @@ export function createCapabilityRegistry(): CapabilityRegistry {
         flakeOutput: "flake_output",
         autoDeploy: "auto_deploy",
         healthPath: "health_path",
-        restartPolicy: "restart_policy",
       };
       const ok = expected.every(([key, value]) => {
         const actual = app[keyMap[key] ?? "id"];
         return key === "autoDeploy" ? Boolean(actual) === value : actual === value;
       });
       return { ok, message: ok ? "Application settings verified." : "Settings did not persist." };
+    },
+  });
+
+  const updateRestartPolicyInput = z
+    .object({
+      appId: appIdSchema,
+      restartPolicy: z.enum(["never", "on-failure", "always", "unless-stopped"]),
+    })
+    .passthrough();
+  registry.register({
+    id: "apps.updateRestartPolicy",
+    version: 1,
+    title: "Update application restart policy",
+    description: "Update the application's runtime restart policy.",
+    risk: "mutation",
+    mutates: true,
+    requiredRoles: [...operatorRoles],
+    inputSchema: updateRestartPolicyInput,
+    outputSchema: z.object({ id: z.string(), updatedAt: z.string() }),
+    inputJsonSchema: {
+      type: "object",
+      properties: {
+        appId: { type: "string", format: "uuid" },
+        restartPolicy: { enum: ["never", "on-failure", "always", "unless-stopped"] },
+      },
+      required: ["appId", "restartPolicy"],
+      additionalProperties: false,
+    },
+    async preview(_ctx, input) {
+      const app = getApplication(input.appId);
+      return {
+        summary: `Update restart policy to ${input.restartPolicy} for ${app.name}.`,
+        resourceKeys: [`app:${app.id}`],
+        stateVersion: app.updated_at,
+        redactedInput: input,
+      };
+    },
+    async preconditions(_ctx, input, expectedStateVersion) {
+      const app = getApplication(input.appId);
+      return {
+        ok: app.updated_at === expectedStateVersion,
+        stateVersion: app.updated_at,
+        code: "application_changed",
+        message: "The application changed after this plan was proposed.",
+      };
+    },
+    async execute(ctx, input) {
+      const app = updateApplication(input.appId, { restartPolicy: input.restartPolicy }, { id: ctx.actor.id });
+      await (await getRuntime()).proxy.reconcile();
+      return { id: app.id, updatedAt: app.updated_at };
+    },
+    async verify(_ctx, input) {
+      const app = getApplication(input.appId);
+      const ok = app.restart_policy === input.restartPolicy;
+      return { ok, message: ok ? "Restart policy verified." : "Restart policy did not persist." };
     },
   });
 
@@ -1982,8 +2100,9 @@ export function createCapabilityRegistry(): CapabilityRegistry {
   registry.register({
     id: "apps.deploy",
     version: 1,
-    title: "Deploy application",
-    description: "Queue a deployment only after the application's source remains deployable.",
+    title: "Redeploy existing application",
+    description:
+      "Queue a new deployment for an existing application that was already created (requires existing appId). For deploying a new repository URL or Harbur snapshot, use apps.createFromSource.",
     risk: "mutation",
     mutates: true,
     requiredRoles: [...operatorRoles],
@@ -2112,11 +2231,11 @@ export function createCapabilityRegistry(): CapabilityRegistry {
 
   const setEnvironmentInput = z
     .object({
-      appId: z.string().uuid(),
+      appId: appIdSchema,
       secretRef: z.string().min(20),
       secret: z.boolean().default(true),
     })
-    .strict();
+    .passthrough();
   registry.register({
     id: "apps.setEnvironmentKeys",
     version: 1,
@@ -2186,9 +2305,9 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     },
   });
 
-  const deleteEnvironmentInput = z
-    .object({ appId: z.string().uuid(), keys: z.array(z.string().min(1)).min(1).max(200) })
-    .strict();
+  const deleteEnvironmentKeysInput = z
+    .object({ appId: appIdSchema, keys: z.array(z.string().min(1)).min(1).max(200) })
+    .passthrough();
   registry.register({
     id: "apps.deleteEnvironmentKeys",
     version: 1,
@@ -2197,7 +2316,7 @@ export function createCapabilityRegistry(): CapabilityRegistry {
     risk: "mutation",
     mutates: true,
     requiredRoles: [...operatorRoles],
-    inputSchema: deleteEnvironmentInput,
+    inputSchema: deleteEnvironmentKeysInput,
     outputSchema: z.object({ removed: z.array(z.string()) }),
     inputJsonSchema: {
       type: "object",

@@ -23,6 +23,10 @@ export class CapabilityRegistry {
     this.entries.set(capability.id, capability as Capability<unknown, unknown>);
   }
 
+  has(id: string): boolean {
+    return this.entries.has(id);
+  }
+
   get(id: string): Capability<unknown, unknown> {
     const capability = this.entries.get(id);
     if (!capability) {
@@ -34,17 +38,27 @@ export class CapabilityRegistry {
   descriptors(
     options: { query?: string; role?: Role; readOnly?: boolean } = {},
   ): CapabilityDescriptor[] {
-    const terms = (options.query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+    const stopWords = new Set(["a", "an", "the", "as", "from", "to", "in", "for", "of", "with", "on", "and", "or"]);
+    const terms = (options.query ?? "")
+      .toLowerCase()
+      .split(/[^a-z0-9_.-]+/)
+      .filter((t) => t.length > 0 && !stopWords.has(t));
     return [...this.entries.values()]
       .filter((capability) => !options.readOnly || !capability.mutates)
       .filter((capability) => !options.role || capability.requiredRoles.includes(options.role))
-      .filter((capability) => {
-        if (terms.length === 0) return true;
+      .map((capability) => {
+        if (terms.length === 0) return { capability, score: 1 };
         const haystack =
           `${capability.id} ${capability.title} ${capability.description}`.toLowerCase();
-        return terms.every((term) => haystack.includes(term));
+        let score = 0;
+        for (const term of terms) {
+          if (haystack.includes(term)) score += 1;
+        }
+        return { capability, score };
       })
-      .map((capability) => ({
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score || a.capability.id.localeCompare(b.capability.id))
+      .map(({ capability }) => ({
         id: capability.id,
         version: capability.version,
         title: capability.title,
@@ -52,8 +66,7 @@ export class CapabilityRegistry {
         risk: capability.risk,
         requiredRoles: capability.requiredRoles,
         inputSchemaSummary: capability.inputJsonSchema,
-      }))
-      .sort((left, right) => left.id.localeCompare(right.id));
+      }));
   }
 }
 
