@@ -317,7 +317,7 @@ Approval returns an `AiRunRecord` containing run status and step records:
 }
 ```
 
-Background execution publishes run-step, deployment and managed-Ollama progress over
+Background execution publishes run-step and deployment progress over
 authenticated SSE. Results come from capability implementations and verification,
 not generated model prose. They are not automatically sent back to the model; a
 later chat request must use read capabilities to observe current state.

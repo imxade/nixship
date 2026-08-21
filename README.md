@@ -75,10 +75,10 @@ See [`docs/DEPLOYMENT_CONTRACT.md`](docs/DEPLOYMENT_CONTRACT.md) and the
 
 ## AI assistant
 
-The dashboard includes a global AI SDK assistant drawer. It can answer questions
+The dashboard includes a global AI assistant drawer. It can answer questions
 through bounded read capabilities and can operate applications, deployments,
 environment metadata, GitHub/Harbur sources, Cloudflare domains, AI providers,
-model defaults, and the optional managed Ollama runtime.
+and model defaults.
 
 The model receives role-filtered read tools as JSON-Schema function definitions and
 discovers mutation descriptors through `capabilities_search`. It can return an
@@ -87,7 +87,7 @@ schema. Mutation implementations are never model-callable.
 
 Plans are bound to a canonical SHA-256 hash, state snapshot, capability versions and
 the authenticated human. Approval reloads the persisted plan and starts deterministic
-Nix Ship code; deployment and model-download progress comes from real runtime events.
+Nix Ship code; deployment progress comes from real runtime events.
 Sensitive/destructive plans require current-password re-authentication, and secure
 input plaintext never enters model context; the model sees only a scoped, expiring,
 one-use opaque reference. See
@@ -99,7 +99,9 @@ must be committed; otherwise the assistant provides a starter flake and exact
 lock/hash instructions instead of proposing deployment. Models must pass the
 strict tool/plan compatibility probe before planning; failures remain answer-only.
 
-Configure an OpenAI-compatible endpoint before startup:
+Operators can configure any OpenAI-compatible provider (Ollama, Anthropic Claude,
+Google Gemini, OpenAI, Groq, Mistral, DeepSeek, or a LiteLLM Proxy) via the dashboard
+`/ai` page or via environment variables before startup:
 
 ```bash
 PLATFORM_AI_BASE_URL=https://provider.example/v1
@@ -110,7 +112,7 @@ PLATFORM_AI_API_KEY=... # optional for a trusted local endpoint
 Private external endpoints, including operator-run Ollama on loopback, additionally require
 `PLATFORM_AI_ALLOW_PRIVATE_NETWORK=true`. Plain HTTP is accepted only for an
 explicitly enabled private endpoint. Never paste credentials into chat; use the
-masked secure-input card.
+masked secure-input card or provider management card.
 
 For a flake-pinned local Ollama development environment, use the optional AI shell:
 
@@ -122,8 +124,7 @@ ollama serve
 In a second `nix develop .#ai` shell, pull an exact model tag, export that tag as
 both `PLATFORM_AI_MODEL` and `AI_LOCAL_TEST_MODEL`, then run `pnpm test:ai-local`.
 The AI shell sets the loopback endpoint, private-network opt-in and a repository-local
-Ollama model directory. Ollama remains outside the base production closure; managed
-Ollama is realized and started only by an approved plan.
+Ollama model directory.
 
 See [`SPECIFICATION.md`](SPECIFICATION.md) for the normative platform requirements,
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the AI control-plane design, and

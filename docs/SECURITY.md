@@ -141,10 +141,11 @@ strict plan format and deterministic execution result are documented in
 - A provider/model must pass the bounded strict-tool, exact-plan, prompt-injection
   and opaque-secret compatibility probe before its first proposed mutation plan is
   accepted. Probe failure leaves ordinary answer mode available.
-- Managed Ollama is optional, lazy, loopback-only, process-identity checked and
-  defaults to one loaded model and one parallel request. An occupied endpoint that
-  Nix Ship does not own is rejected. Pull progress is parsed from Ollama's real
-  stream, never generated as model prose.
+- Provider URLs are validated with strict SSRF protection: credentials, query strings,
+  and fragments are rejected; link-local and cloud metadata addresses are blocked; and
+  loopback/private network endpoints require explicit opt-in.
+- Provider API keys are ingested via ephemeral opaque references (`aisec_*`), stored
+  encrypted with AES-256-GCM, and never returned in plaintext, logs, telemetry, or API responses.
 
 ## Remaining high-priority hardening
 

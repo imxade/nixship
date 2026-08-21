@@ -22,20 +22,20 @@ Last updated: 2026-08-14.
 - Typed capabilities cover system/app/deployment/settings reads and mutations,
   public GitHub/Harbur source inspection and deployment, environment keys,
   lifecycle/promotion/cancellation, Cloudflare connection/domains/tunnel state,
-  Harbur connections, provider profiles/defaults/probes, and managed Ollama.
-- Provider/model profiles are persisted without returning keys. Conversation and
-  action-planner selection are independent, and an exact compatibility probe keeps
-  nonconforming models in answer-only mode. The composer includes a searchable
-  install/select/remove model picker.
+  Harbur connections, provider profiles/defaults/probes, and multi-provider settings.
+- Provider/model profiles are persisted without returning keys. Unified OpenAI-compatible
+  architecture supports Ollama (local/remote), Anthropic Claude, Google Gemini, OpenAI,
+  Groq, Mistral, DeepSeek, and LiteLLM Proxy. Conversation and action-planner selection
+  are independent, and an exact compatibility probe keeps nonconforming models in answer-only mode.
+  The composer includes a searchable model picker.
 - Node.js 24 is now the consistent development, package-engine and Nix runtime
   baseline.
 - TypeScript 7.0.2 and `@types/node` 26.2.0 are now the pinned compiler and Node
   API type baselines. Source and server typechecks, the production build,
   browser flows, deployment integrations and the Nix package all pass with the
   native compiler release.
-- `nix develop .#ai` and `packages.ollama` supply flake-pinned Ollama. The production
-  manager lazily realizes it into a GC root, owns a loopback-only process identity,
-  applies low-resource concurrency limits and leaves it outside the base closure.
+- `nix develop .#ai` and `packages.ollama` supply flake-pinned Ollama for local model execution.
+  Nix Ship communicates with any standard OpenAI-compatible endpoint or LiteLLM proxy.
 
 - User-facing brand values remain centralized while runtime identifiers use the
   neutral `PLATFORM_*` contract. Old environment, data, backup, and executable
