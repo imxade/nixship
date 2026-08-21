@@ -72,7 +72,7 @@ const provider = new OpenAiCompatibleProvider({
   baseUrl,
   modelId,
   allowPrivateNetwork: true,
-  timeoutMs: 180_000,
+  timeoutMs: 300_000,
   maxOutputTokens: 2048,
   disableReasoning: true,
   plannerProbeBypass: true,
@@ -106,8 +106,7 @@ try {
        VALUES (?, ?, 'direct-live-test', '2099-01-01T00:00:00.000Z', ?, ?)`,
     )
     .run(actor.sessionId, actor.id, now, now);
-  runtime = new runtimeModule.PlatformRuntime();
-  await runtime.boot();
+  runtime = await runtimeModule.getRuntime();
   database.setSetting("ai_max_model_steps", "10");
   await reauth.createAiReauthGrant(actor, password);
 

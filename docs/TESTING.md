@@ -15,7 +15,6 @@ pnpm test:harbur-private            # secret-backed external deployment test
 pnpm test:ai-local                  # opt-in real local OpenAI-compatible model probe
 pnpm test:ai-github                 # real Kitsy inspect/plan/approve/build/health test
 pnpm test:ai-harbur                 # real public Harbur snapshot deployment test
-pnpm test:ai-ollama                 # flake-built managed Ollama lifecycle test
 pnpm db:doctor
 pnpm security:check
 pnpm audit --prod --audit-level high
@@ -99,18 +98,15 @@ places plaintext in model or plan data. Override `AI_HARBUR_TEST_REPOSITORY_ID` 
 another repository. The test fails if the snapshot is missing a locked flake, if the
 workload ignores its assigned runtime address, or if health activation does not pass.
 
-`pnpm test:ai-ollama` requires `PLATFORM_OLLAMA_BIN` from `nix build .#ollama` and
-verifies lazy enable, loopback readiness, owned process identity, isolated model
-storage and clean disable.
-
-`pnpm test:ai-local` is separate evidence for an actually installed local model.
+`tests/integration/ai-live-planner.ts` is the end-to-end multi-scenario integration
+test for real model providers (including local Ollama and LiteLLM endpoints). It exercises
+the full autonomous lifecycle across 6 live scenarios: Harbur deployment, public GitHub
+deployment, rename, stop, start, and read queries.
+It requires `AI_LOCAL_TEST_BASE_URL` (e.g. `http://127.0.0.1:11434/v1`) and `AI_LOCAL_TEST_MODEL`
+(e.g. `qwen2.5:7b`); omitting them is a failure, not a skipped or fabricated pass.
 The model runtime can be obtained reproducibly with `nix develop .#ai`; start
-`ollama serve`, pull an exact model tag, and set `AI_LOCAL_TEST_MODEL` before running
-the harness. Merely evaluating the shell or downloading a model is not a passing
-model result.
-It requires `AI_LOCAL_TEST_BASE_URL` and `AI_LOCAL_TEST_MODEL`; omitting them is a
-failure, not a skipped or fabricated pass. The test does not install weights or
-open a listening service and never grants the model a mutation tool.
+`ollama serve`, pull an exact model tag, and set the environment variables before running
+the harness.
 
 Quick Tunnel unit coverage validates strict `trycloudflare.com` URL discovery,
 rejects deceptive suffixes, and requires both public DNS and an edge response

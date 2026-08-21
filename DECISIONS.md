@@ -110,7 +110,24 @@ tool call from acquiring mutation authority.
 **Consequence:** Capability IDs and versions, schemas, RBAC, state snapshots,
 resource locks, audit records, idempotency keys and postcondition verification are
 Nix Ship-owned contracts. AI outages never block the ordinary dashboard. Provider
-profiles, opaque secure references, separate model roles and lazy managed Ollama
+profiles, opaque secure references, and separate model roles
 remain implementations of this boundary rather than alternative authorities. The
 implemented model/tool/plan/run contract is described in
 [`docs/AI_CONTROL_PLANE.md`](docs/AI_CONTROL_PLANE.md).
+
+## ADR-014 — Unified multi-provider AI layer via standard OpenAI-compatible endpoints
+
+**Decision:** Unify all AI model providers (local Ollama, Anthropic Claude, Google Gemini,
+OpenAI, Groq, Mistral, DeepSeek, LiteLLM Proxy, and custom OpenAI-compatible gateways)
+behind a single provider-neutral `@ai-sdk/openai-compatible` adapter and a dynamic database
+provider registry. Remove dedicated provider-specific daemon supervisors from the application core.
+
+**Reason:** The application core should not care which AI provider is being used.
+Standard OpenAI-compatible wire format and LiteLLM normalizes requests, responses,
+streaming, tool-calling, and error handling across all major model providers while keeping
+the TypeScript application lightweight and strictly typed.
+
+**Consequence:** Provider credentials are encrypted at rest with AES-256-GCM and never exposed.
+Endpoints are validated with strict SSRF protection. The operator can configure and switch
+between cloud and local models at runtime from the dashboard without code changes.
+

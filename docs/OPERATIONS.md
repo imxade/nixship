@@ -87,11 +87,10 @@ pnpm test:ai-local
 pnpm dev
 ```
 
-The production flake also exposes `packages.ollama`. Managed Ollama is absent from
-the base Nix Ship closure: approved runtime enablement realizes the pinned reference
-into a data-directory GC root and starts it on loopback. Pull/remove actions use
-normal plan approval, with real pull progress in the assistant. Disable stops the
-owned process without deleting weights.
+The production flake also exposes `packages.ollama`. Operators can connect Nix Ship
+to any local Ollama server, LiteLLM proxy, or remote provider via the `/ai` settings page
+in the web dashboard. Provider credentials and endpoint URLs are securely configured and
+encrypted on demand.
 
 ## First-run claim
 
