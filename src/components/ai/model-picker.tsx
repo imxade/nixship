@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 
 interface ModelProfile {
@@ -51,16 +51,27 @@ export function ModelPicker({
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pulling, setPulling] = useState<string | null>(null);
+  const [pullPercent, setPullPercent] = useState<number | null>(null);
+  const [pullStatus, setPullStatus] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const loadInventory = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      setInventory(await apiFetch<ModelInventory>("/api/ai/models"));
+    } catch (cause: unknown) {
+      setError(errorText(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    setError("");
-    void apiFetch<ModelInventory>("/api/ai/models")
-      .then(setInventory)
-      .catch((cause: unknown) => setError(errorText(cause)))
-      .finally(() => setLoading(false));
-  }, [open]);
+    void loadInventory();
+  }, [open, loadInventory]);
 
   const profiles = useMemo(
     () =>
@@ -115,10 +126,81 @@ export function ModelPicker({
     }
   }
 
-  async function requestMutation(command: string) {
-    setOpen(false);
-    await onCommand(command);
+  async function pullModel(model: string) {
+    setPulling(model);
+    setPullPercent(null);
+    setPullStatus("Starting…");
+    setError("");
+    try {
+      const response = await fetch("/api/ai/runtime/pull", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model }),
+        credentials: "same-origin",
+      });
+      if (!response.ok || !response.body) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(
+          (payload as { error?: { message?: string } } | null)?.error?.message ??
+            `Download failed (${response.status})`,
+        );
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let boundary = buffer.indexOf("\n\n");
+        while (boundary >= 0) {
+          const raw = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const eventMatch = /^event: (.+)$/m.exec(raw);
+          const dataMatch = /^data: (.+)$/m.exec(raw);
+          if (eventMatch && dataMatch) {
+            const event = eventMatch[1];
+            const data = JSON.parse(dataMatch[1] ?? "{}") as Record<string, unknown>;
+            if (event === "progress") {
+              setPullPercent((data.percent as number | null) ?? null);
+              setPullStatus((data.status as string | null) ?? "Downloading…");
+            } else if (event === "done") {
+              setPullStatus("Complete");
+            } else if (event === "error") {
+              throw new Error((data.message as string) || "Download failed");
+            }
+          }
+          boundary = buffer.indexOf("\n\n");
+        }
+      }
+      await loadInventory();
+    } catch (cause: unknown) {
+      setError(errorText(cause));
+    } finally {
+      setPulling(null);
+      setPullPercent(null);
+      setPullStatus(null);
+    }
   }
+
+  async function removeModel(model: string) {
+    setRemoving(model);
+    setError("");
+    try {
+      await apiFetch("/api/ai/runtime/remove", {
+        method: "POST",
+        body: JSON.stringify({ model }),
+      });
+      await loadInventory();
+    } catch (cause: unknown) {
+      setError(errorText(cause));
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  // Keep onCommand reference alive to avoid lint warnings
+  void onCommand;
 
   return (
     <div className="relative">
@@ -146,6 +228,19 @@ export function ModelPicker({
           <div className="mt-3 max-h-80 space-y-3 overflow-y-auto">
             {loading && <span className="loading loading-dots loading-sm" />}
             {error && <p className="text-sm text-error">{error}</p>}
+            {pulling && (
+              <div className="rounded-box border border-primary/30 bg-primary/5 p-2">
+                <div className="mb-1 text-sm font-medium">Downloading {pulling}…</div>
+                <div className="text-xs text-base-content/60">{pullStatus}</div>
+                {pullPercent != null && (
+                  <progress
+                    className="progress progress-primary mt-1 w-full"
+                    value={pullPercent}
+                    max={100}
+                  />
+                )}
+              </div>
+            )}
             {visibleProfiles.length > 0 && (
               <ModelSection title="Configured">
                 {visibleProfiles.map((profile) => (
@@ -190,11 +285,10 @@ export function ModelPicker({
                           <button
                             type="button"
                             className="btn btn-ghost btn-xs text-error"
-                            onClick={() =>
-                              void requestMutation(`Remove local model ${model.name}.`)
-                            }
+                            disabled={removing === model.name}
+                            onClick={() => void removeModel(model.name)}
                           >
-                            Delete
+                            {removing === model.name ? "Removing…" : "Delete"}
                           </button>
                         </div>
                       </div>
@@ -210,12 +304,9 @@ export function ModelPicker({
                     key={model.modelId}
                     title={model.displayName}
                     detail={`${formatBytes(model.approximateSizeBytes)} · ${model.resourceClass}`}
-                    action="Download"
-                    onAction={() =>
-                      void requestMutation(
-                        `Download local model ${model.modelId} through managed Ollama.`,
-                      )
-                    }
+                    action={pulling === model.modelId ? "Pulling…" : "Download"}
+                    disabled={pulling !== null}
+                    onAction={() => void pullModel(model.modelId)}
                   />
                 ))}
               </ModelSection>
@@ -230,13 +321,10 @@ export function ModelPicker({
                 <ModelSection title="Exact Ollama tag">
                   <ModelRow
                     title={directTag}
-                    detail="Direct tag · size checked during approved pull"
-                    action="Download"
-                    onAction={() =>
-                      void requestMutation(
-                        `Download local model ${directTag} through managed Ollama.`,
-                      )
-                    }
+                    detail="Direct tag · size checked during pull"
+                    action={pulling === directTag ? "Pulling…" : "Download"}
+                    disabled={pulling !== null}
+                    onAction={() => void pullModel(directTag)}
                   />
                 </ModelSection>
               )}
@@ -260,11 +348,13 @@ function ModelRow({
   title,
   detail,
   action,
+  disabled,
   onAction,
 }: {
   title: string;
   detail: string;
   action: string;
+  disabled?: boolean;
   onAction: () => void;
 }) {
   return (
@@ -273,7 +363,12 @@ function ModelRow({
         <div className="truncate text-sm font-medium">{title}</div>
         <div className="truncate text-xs text-base-content/60">{detail}</div>
       </div>
-      <button type="button" className="btn btn-primary btn-xs" onClick={onAction}>
+      <button
+        type="button"
+        className="btn btn-primary btn-xs"
+        disabled={disabled}
+        onClick={onAction}
+      >
         {action}
       </button>
     </div>
