@@ -42,15 +42,17 @@ export class ProxyManager {
     const apps = getDb()
       .prepare("SELECT * FROM applications WHERE kind = 'web' AND public_port IS NOT NULL")
       .all() as AppRow[];
-    const expected = new Set(apps.map((app) => app.id));
-    for (const app of apps) {
-      const existing = this.listeners.get(app.id);
-      if (existing?.port === app.public_port) continue;
-      if (existing) await this.closeListener(app.id);
-      if (app.public_port) await this.openListener(app.id, app.public_port);
+    const expected = new Map(apps.map((app) => [app.id, app.public_port]));
+    for (const [appId, listener] of [...this.listeners.entries()]) {
+      const expectedPort = expected.get(appId);
+      if (expectedPort !== listener.port) {
+        await this.closeListener(appId);
+      }
     }
-    for (const appId of this.listeners.keys()) {
-      if (!expected.has(appId)) await this.closeListener(appId);
+    for (const app of apps) {
+      if (app.public_port && !this.listeners.has(app.id)) {
+        await this.openListener(app.id, app.public_port);
+      }
     }
   }
 

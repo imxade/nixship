@@ -31,6 +31,7 @@ describe("database migrations", () => {
     apply(db, migration("014_ai_control_plane.sql"));
     apply(db, migration("015_ai_reauthentication.sql"));
     apply(db, migration("016_ai_conversation_models.sql"));
+    apply(db, migration("017_ai_providers_unified.sql"));
 
     expect(
       db
@@ -169,6 +170,8 @@ describe("database migrations", () => {
     apply(db, migration("013_drop_cloudflare_domain_status.sql"));
     apply(db, migration("014_ai_control_plane.sql"));
     apply(db, migration("015_ai_reauthentication.sql"));
+    apply(db, migration("016_ai_conversation_models.sql"));
+    apply(db, migration("017_ai_providers_unified.sql"));
 
     expect(db.prepare("SELECT hostname, app_id FROM application_domains").all()).toEqual([
       { hostname: "app.example.com", app_id: "app-1" },

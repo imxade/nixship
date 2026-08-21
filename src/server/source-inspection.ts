@@ -79,8 +79,15 @@ export async function inspectPublicGitHubRepository(input: {
   branch?: string;
 }): Promise<PublicGitHubInspection> {
   const parsed = parseGitHubRepositoryUrl(input.repositoryUrl);
+  const repositoryUrl = `https://github.com/${parsed.owner}/${parsed.repository}.git`;
   const api = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repository)}`;
   const metadataResponse = await githubFetch(api);
+  let branch: string;
+  let hasFlake = false;
+  let hasFlakeLock = false;
+  let packageJson: string | null = null;
+  let archived = false;
+
   if (metadataResponse.status === 404) {
     throw new HttpError(
       409,
@@ -88,40 +95,64 @@ export async function inspectPublicGitHubRepository(input: {
       "github_auth_required",
     );
   }
-  if (!metadataResponse.ok) {
+
+  if (metadataResponse.ok) {
+    const metadata = githubRepositorySchema.parse(await boundedJson(metadataResponse));
+    if (metadata.private) {
+      throw new HttpError(
+        409,
+        "The repository is private. Connect GitHub before deploying it.",
+        "github_auth_required",
+      );
+    }
+    archived = metadata.archived;
+    branch =
+      input.branch?.trim() || metadata.default_branch || (await remoteDefaultBranch(repositoryUrl));
+    [hasFlake, hasFlakeLock, packageJson] = await Promise.all([
+      githubFileExists(api, "flake.nix", branch),
+      githubFileExists(api, "flake.lock", branch),
+      githubTextFile(api, "package.json", branch),
+    ]);
+  } else if (metadataResponse.status === 403) {
+    branch = input.branch?.trim() || (await remoteDefaultBranch(repositoryUrl));
+    const [flakeRes, lockRes, pkgRes] = await Promise.all([
+      fetch(
+        `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repository}/${encodeURIComponent(branch)}/flake.nix`,
+        { method: "HEAD", signal: AbortSignal.timeout(10_000) },
+      ).catch(() => null),
+      fetch(
+        `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repository}/${encodeURIComponent(branch)}/flake.lock`,
+        { method: "HEAD", signal: AbortSignal.timeout(10_000) },
+      ).catch(() => null),
+      fetch(
+        `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repository}/${encodeURIComponent(branch)}/package.json`,
+        { signal: AbortSignal.timeout(10_000) },
+      )
+        .then((r) => (r.ok ? r.text() : null))
+        .catch(() => null),
+    ]);
+    hasFlake = Boolean(flakeRes?.ok);
+    hasFlakeLock = Boolean(lockRes?.ok);
+    packageJson = pkgRes;
+  } else {
     throw new HttpError(
       502,
       `GitHub repository inspection failed with HTTP ${metadataResponse.status}`,
       "github_inspection_failed",
     );
   }
-  const metadata = githubRepositorySchema.parse(await boundedJson(metadataResponse));
-  if (metadata.private) {
-    throw new HttpError(
-      409,
-      "The repository is private. Connect GitHub before deploying it.",
-      "github_auth_required",
-    );
-  }
-  const repositoryUrl = `https://github.com/${parsed.owner}/${parsed.repository}.git`;
-  const branch =
-    input.branch?.trim() || metadata.default_branch || (await remoteDefaultBranch(repositoryUrl));
-  const [hasFlake, hasFlakeLock, packageJson] = await Promise.all([
-    githubFileExists(api, "flake.nix", branch),
-    githubFileExists(api, "flake.lock", branch),
-    githubTextFile(api, "package.json", branch),
-  ]);
+
   const missingFiles = [
     ...(hasFlake ? [] : ["flake.nix"]),
     ...(hasFlakeLock ? [] : ["flake.lock"]),
   ];
-  const deployable = missingFiles.length === 0 && !metadata.archived;
+  const deployable = missingFiles.length === 0 && !archived;
   return {
     provider: "github",
     repositoryUrl,
     branch,
     public: true,
-    archived: metadata.archived,
+    archived,
     deployable,
     hasFlake,
     hasFlakeLock,
@@ -129,7 +160,7 @@ export async function inspectPublicGitHubRepository(input: {
     exampleFlake: hasFlake ? null : exampleFlake(packageJson),
     guidance: deployable
       ? null
-      : metadata.archived
+      : archived
         ? "The repository is archived and should not be deployed until it is made active."
         : "Use the starter below as a project-specific template. Run `nix build`, replace `pkgs.lib.fakeHash` with the dependency hash Nix reports, and run `nix flake lock`. Commit flake.nix and flake.lock to the selected branch, then ask Nix Ship to inspect it again.",
   };
@@ -205,14 +236,19 @@ async function githubTextFile(api: string, file: string, branch: string): Promis
 }
 
 async function githubFetch(url: string): Promise<Response> {
+  const headers: Record<string, string> = {
+    accept: "application/vnd.github+json",
+    "user-agent": "nixship-source-inspector",
+    "x-github-api-version": "2022-11-28",
+  };
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
   return fetch(url, {
     redirect: "error",
     signal: AbortSignal.timeout(20_000),
-    headers: {
-      accept: "application/vnd.github+json",
-      "user-agent": "nixship-source-inspector",
-      "x-github-api-version": "2022-11-28",
-    },
+    headers,
   });
 }
 

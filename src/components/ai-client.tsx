@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
+import { AiProvidersCard } from "./ai-providers-card";
 import { AiSettingsCard } from "./ai-settings-card";
 import { PageHeading } from "./page-heading";
 
@@ -69,6 +70,7 @@ export function AiClient() {
           </div>
         </div>
       )}
+      <AiProvidersCard onUpdated={() => void load()} />
       <AiSettingsCard />
     </>
   );
