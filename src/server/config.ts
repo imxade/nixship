@@ -34,8 +34,6 @@ const envSchema = z.object({
   PLATFORM_AI_API_KEY: z.string().max(8192).optional(),
   PLATFORM_AI_ALLOW_PRIVATE_NETWORK: envBoolean(false),
   PLATFORM_AI_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(300).default(60),
-  PLATFORM_OLLAMA_BIN: z.string().trim().optional().default(""),
-  PLATFORM_OLLAMA_NIX_REF: z.string().trim().optional().default(""),
 });
 
 export const config = envSchema.parse(process.env);

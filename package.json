@@ -31,7 +31,6 @@
     "test:harbur-private": "tsx tests/integration/harbur-private.ts",
     "test:ai-local": "tsx tests/integration/ai-local.ts",
     "test:ai-github": "tsx tests/integration/ai-public-github.ts",
-    "test:ai-ollama": "tsx tests/integration/ai-ollama-runtime.ts",
     "test:ai-harbur": "tsx tests/integration/ai-harbur-public.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

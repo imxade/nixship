@@ -33,6 +33,7 @@ export interface ProviderResponse {
 export interface AiProvider {
   id: string;
   modelId: string;
+  providerType?: string;
   plannerProbeBypass?: boolean;
   complete(messages: ProviderMessage[], tools: ProviderTool[]): Promise<ProviderResponse>;
 }
@@ -233,6 +234,8 @@ function isTimeoutError(error: unknown): boolean {
 interface StoredProviderProfileRow {
   profile_id: string;
   provider_id: string;
+  provider_type?: string;
+  provider_name?: string;
   base_url: string;
   api_key_ciphertext: string | null;
   allow_private_network: number;
@@ -256,7 +259,6 @@ export function configuredAiProvider(profileId?: string | null): AiProvider {
     apiKey: config.PLATFORM_AI_API_KEY,
     allowPrivateNetwork: config.PLATFORM_AI_ALLOW_PRIVATE_NETWORK,
     timeoutMs: config.PLATFORM_AI_TIMEOUT_SECONDS * 1000,
-    disableReasoning: isOllamaUrl(config.PLATFORM_AI_BASE_URL),
   });
 }
 
@@ -264,11 +266,6 @@ export function providerForProfile(profileId: string): AiProvider {
   const stored = selectedStoredProfile(profileId, true);
   if (!stored) throw new HttpError(404, "AI model profile not found", "ai_model_not_found");
   return providerFromStoredProfile(stored);
-}
-
-function isOllamaUrl(value: string): boolean {
-  const url = new URL(value);
-  return ["localhost", "127.0.0.1", "::1"].includes(url.hostname) && url.port === "11434";
 }
 
 export function aiProviderStatus(): {
@@ -281,7 +278,7 @@ export function aiProviderStatus(): {
   if (stored) {
     return {
       configured: true,
-      provider: stored.provider_id,
+      provider: stored.provider_name || stored.provider_type || stored.provider_id,
       model: stored.model_id,
       remote: !isPrivateHostname(new URL(stored.base_url).hostname),
     };
@@ -347,6 +344,8 @@ function selectedStoredProfile(
       `SELECT
          p.id AS profile_id,
          c.id AS provider_id,
+         c.type AS provider_type,
+         c.name AS provider_name,
          c.base_url,
          c.api_key_ciphertext,
          c.allow_private_network,
@@ -360,7 +359,8 @@ function selectedStoredProfile(
 }
 
 function providerFromStoredProfile(row: StoredProviderProfileRow): AiProvider {
-  let metadata: { timeoutSeconds?: number; maxOutputTokens?: number } = {};
+  let metadata: { timeoutSeconds?: number; maxOutputTokens?: number; disableReasoning?: boolean } =
+    {};
   try {
     metadata = JSON.parse(row.metadata_json) as typeof metadata;
   } catch {}
@@ -370,12 +370,13 @@ function providerFromStoredProfile(row: StoredProviderProfileRow): AiProvider {
     apiKey: row.api_key_ciphertext ? decryptSecret(row.api_key_ciphertext) : undefined,
     allowPrivateNetwork: Boolean(row.allow_private_network),
     timeoutMs: Math.min(300, Math.max(5, metadata.timeoutSeconds ?? 60)) * 1000,
-    maxOutputTokens: Math.min(8192, Math.max(128, metadata.maxOutputTokens ?? 768)),
-    disableReasoning: isOllamaUrl(row.base_url),
+    maxOutputTokens: Math.min(8192, Math.max(128, metadata.maxOutputTokens ?? 2048)),
+    disableReasoning: Boolean(metadata.disableReasoning),
   });
   return {
     id: row.provider_id,
     modelId: provider.modelId,
+    providerType: row.provider_type,
     complete: (messages, tools) => provider.complete(messages, tools),
   };
 }

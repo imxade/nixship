@@ -124,4 +124,39 @@ describe("persisted AI provider registry", () => {
       providers.setAiModelDefault(actor, profile?.id ?? "", "action_planner"),
     ).toThrowError(/action-planner probe/);
   });
+
+  it("supports multiple provider types through LiteLLM and presets", async () => {
+    const catalog = await import("../../src/server/ai/provider-catalog.ts");
+    expect(catalog.AI_PROVIDER_PRESETS.length).toBeGreaterThan(5);
+    const anthropicPreset = catalog.findProviderPreset("anthropic");
+    expect(anthropicPreset).toBeDefined();
+    expect(anthropicPreset?.defaultBaseUrl).toContain("anthropic.com");
+
+    const litellmPreset = catalog.findProviderPreset("litellm");
+    expect(litellmPreset).toBeDefined();
+    expect(litellmPreset?.allowPrivateNetworkDefault).toBe(true);
+
+    const configured = await providers.configureAiProvider(actor, {
+      type: "anthropic",
+      name: "Anthropic Claude",
+      baseUrl: "https://api.anthropic.com/v1",
+      secretRef: null,
+      allowPrivateNetwork: false,
+      timeoutSeconds: 60,
+      maxOutputTokens: 2048,
+      models: [
+        { modelId: "claude-3-5-sonnet-latest", displayName: "Claude 3.5 Sonnet" },
+        { modelId: "claude-3-5-haiku-latest", displayName: "Claude 3.5 Haiku" },
+      ],
+    });
+
+    expect(configured.type).toBe("anthropic");
+    expect(configured.models).toHaveLength(2);
+
+    const all = providers.listAiProviders();
+    const found = all.find((p) => p.id === configured.id);
+    expect(found?.type).toBe("anthropic");
+    expect(found?.models.some((m) => m.modelId === "claude-3-5-sonnet-latest")).toBe(true);
+    expect(found?.models.some((m) => m.modelId === "claude-3-5-haiku-latest")).toBe(true);
+  });
 });

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { AI_PROVIDER_PRESETS } from "@/server/ai/provider-catalog";
 import {
   configureAiProvider,
   configureProviderSchema,
@@ -15,7 +16,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   return api(request, () => {
     requestActor(request);
-    return { providers: listAiProviders() };
+    return {
+      providers: listAiProviders(),
+      presets: AI_PROVIDER_PRESETS,
+    };
   });
 }
 

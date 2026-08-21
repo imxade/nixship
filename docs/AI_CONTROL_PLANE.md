@@ -334,13 +334,26 @@ consumed once by the deterministic capability. Its encrypted reference row is de
 as part of consumption. The plaintext is never placed in chat history, plan metadata,
 tool results or model context.
 
+## Multi-provider architecture & LiteLLM integration
+
+Nix Ship provides a unified provider-neutral AI interface across all workflows:
+
+- **Universal wire format**: Integrates with OpenAI-compatible endpoints and LiteLLM proxies (`@ai-sdk/openai-compatible`) using a consistent tool-calling, message, and error protocol.
+- **Supported providers**: Out-of-the-box presets for Ollama (local/remote), Anthropic Claude, Google Gemini, OpenAI, Groq, Mistral, DeepSeek, LiteLLM Proxy, and custom OpenAI-compatible gateways.
+- **Provider neutrality**: AI workflows (`planner.ts`, `assistant-drawer.tsx`, `model-probe.ts`) interact exclusively with the abstract `AiProvider` interface without hardcoded provider branching.
+- **Secure credential management**: Provider API keys are ingested via ephemeral opaque references (`aisec_*`), stored with AES-256-GCM encryption in SQLite, and never exposed in plaintext, logs, telemetry, or API responses.
+- **Dynamic catalog & presets**: Operators can configure, update, probe, enable/disable, or delete any provider directly from the dashboard.
+
 ## Implementation map
 
+- Provider catalog & presets: `src/server/ai/provider-catalog.ts`
+- Unified provider registry: `src/server/ai/provider-registry.ts`
+- OpenAI-compatible & LiteLLM adapter: `src/server/ai/provider.ts`
 - Planner loop and tool exposure: `src/server/ai/planner.ts`
-- OpenAI-compatible adapter: `src/server/ai/provider.ts`
 - Capability registry contract: `src/server/ai/capabilities/`
 - Plan schema and validation: `src/server/ai/plans/schema.ts` and `validator.ts`
 - Canonical persistence: `src/server/ai/plans/store.ts`
 - Approval and execution: `src/server/ai/plans/executor.ts`
 - Secure references: `src/server/ai/secrets.ts`
 - Compatibility probe: `src/server/ai/model-probe.ts`
+

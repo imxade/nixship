@@ -18,21 +18,22 @@ const modelInputSchema = z
 
 export const configureProviderSchema = z
   .object({
+    type: z.string().trim().min(1).max(50).optional().default("openai-compatible"),
     name: z.string().trim().min(1).max(100),
     baseUrl: z.string().url().max(2048),
-    secretRef: z.string().min(20).nullable().default(null),
-    allowPrivateNetwork: z.boolean().default(false),
-    timeoutSeconds: z.number().int().min(5).max(300).default(60),
-    maxOutputTokens: z.number().int().min(128).max(8192).default(768),
+    secretRef: z.string().min(20).nullable().optional().default(null),
+    allowPrivateNetwork: z.boolean().optional().default(false),
+    timeoutSeconds: z.number().int().min(5).max(300).optional().default(60),
+    maxOutputTokens: z.number().int().min(128).max(8192).optional().default(2048),
     models: z.array(modelInputSchema).min(1).max(20),
   })
   .strict();
 
-export type ConfigureProviderInput = z.infer<typeof configureProviderSchema>;
+export type ConfigureProviderInput = z.input<typeof configureProviderSchema>;
 
 interface ProviderRow {
   id: string;
-  type: "openai-compatible";
+  type: string;
   name: string;
   base_url: string;
   api_key_ciphertext: string | null;
@@ -57,7 +58,7 @@ interface ProfileRow {
 
 export interface SafeAiProvider {
   id: string;
-  type: "openai-compatible";
+  type: string;
   name: string;
   baseUrl: string;
   hasApiKey: boolean;
@@ -178,10 +179,11 @@ export async function configureAiProvider(
         `INSERT INTO ai_provider_configs(
           id, type, name, base_url, api_key_ciphertext, enabled,
           allow_private_network, metadata_json, created_at, updated_at
-        ) VALUES (?, 'openai-compatible', ?, ?, ?, 1, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
       )
       .run(
         id,
+        input.type,
         input.name,
         input.baseUrl,
         apiKey ? encryptSecret(apiKey) : null,
@@ -313,100 +315,6 @@ export function getModelProfile(profileId: string): SafeAiModelProfile {
   throw new HttpError(404, "AI model profile not found", "ai_model_not_found");
 }
 
-export function ensureManagedOllamaProfile(modelId: string): SafeAiModelProfile {
-  const baseUrl = "http://127.0.0.1:11434/v1";
-  let provider = getDb()
-    .prepare(
-      "SELECT id FROM ai_provider_configs WHERE type = 'openai-compatible' AND base_url = ? ORDER BY created_at LIMIT 1",
-    )
-    .get(baseUrl) as { id: string } | undefined;
-  const now = nowIso();
-  if (!provider) {
-    provider = { id: crypto.randomUUID() };
-    getDb()
-      .prepare(
-        `INSERT INTO ai_provider_configs(
-          id, type, name, base_url, enabled, allow_private_network, metadata_json, created_at, updated_at
-        ) VALUES (?, 'openai-compatible', 'Managed Ollama', ?, 1, 1, ?, ?, ?)`,
-      )
-      .run(
-        provider.id,
-        baseUrl,
-        JSON.stringify({ timeoutSeconds: 120, maxOutputTokens: 768, managedRuntime: "ollama" }),
-        now,
-        now,
-      );
-  }
-  let profile = getDb()
-    .prepare("SELECT id FROM ai_model_profiles WHERE provider_config_id = ? AND model_id = ?")
-    .get(provider.id, modelId) as { id: string } | undefined;
-  if (!profile) {
-    profile = { id: crypto.randomUUID() };
-    getDb()
-      .prepare(
-        `INSERT INTO ai_model_profiles(
-          id, provider_config_id, model_id, display_name, answer_capable,
-          action_planner_capable, metadata_json
-        ) VALUES (?, ?, ?, ?, 1, 0, '{"managedRuntime":"ollama"}')`,
-      )
-      .run(profile.id, provider.id, modelId, modelId);
-  }
-  if (!setting("ai_conversation_default_profile_id")) {
-    setSetting("ai_conversation_default_profile_id", profile.id);
-  }
-  return getModelProfile(profile.id);
-}
-
-export function assertManagedOllamaModelRemovable(modelId: string): void {
-  const profile = managedOllamaProfileRow(modelId);
-  if (!profile) return;
-  const selectedAsDefault = [
-    setting("ai_conversation_default_profile_id"),
-    setting("ai_action_planner_default_profile_id"),
-  ].includes(profile.id);
-  const selectedConversation = getDb()
-    .prepare("SELECT 1 FROM ai_conversations WHERE model_profile_id = ? LIMIT 1")
-    .get(profile.id);
-  if (selectedAsDefault || selectedConversation) {
-    throw new HttpError(
-      409,
-      "Choose a replacement for every default and conversation before removing this model",
-      "ai_model_in_use",
-    );
-  }
-}
-
-export function removeManagedOllamaProfile(modelId: string): void {
-  const profile = managedOllamaProfileRow(modelId);
-  if (!profile) return;
-  assertManagedOllamaModelRemovable(modelId);
-  getDb().transaction(() => {
-    getDb().prepare("DELETE FROM ai_model_profiles WHERE id = ?").run(profile.id);
-    const remaining = getDb()
-      .prepare("SELECT 1 FROM ai_model_profiles WHERE provider_config_id = ? LIMIT 1")
-      .get(profile.provider_config_id);
-    if (!remaining) {
-      getDb()
-        .prepare("DELETE FROM ai_provider_configs WHERE id = ?")
-        .run(profile.provider_config_id);
-    }
-  })();
-}
-
-function managedOllamaProfileRow(
-  modelId: string,
-): { id: string; provider_config_id: string } | undefined {
-  return getDb()
-    .prepare(
-      `SELECT p.id, p.provider_config_id
-       FROM ai_model_profiles p
-       JOIN ai_provider_configs c ON c.id = p.provider_config_id
-       WHERE c.base_url = 'http://127.0.0.1:11434/v1' AND p.model_id IN (?, ?)
-       ORDER BY p.id LIMIT 1`,
-    )
-    .get(modelId, `${modelId}:latest`) as { id: string; provider_config_id: string } | undefined;
-}
-
 function getProviderRow(providerId: string): ProviderRow {
   const row = getDb().prepare("SELECT * FROM ai_provider_configs WHERE id = ?").get(providerId) as
     | ProviderRow
@@ -420,12 +328,12 @@ function parseMetadata(value: string): { timeoutSeconds: number; maxOutputTokens
     const parsed = z
       .object({
         timeoutSeconds: z.number().int().min(5).max(300).default(60),
-        maxOutputTokens: z.number().int().min(128).max(8192).default(768),
+        maxOutputTokens: z.number().int().min(128).max(8192).default(2048),
       })
       .passthrough()
       .parse(JSON.parse(value));
     return parsed;
   } catch {
-    return { timeoutSeconds: 60, maxOutputTokens: 768 };
+    return { timeoutSeconds: 60, maxOutputTokens: 2048 };
   }
 }
