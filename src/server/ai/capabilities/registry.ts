@@ -38,7 +38,21 @@ export class CapabilityRegistry {
   descriptors(
     options: { query?: string; role?: Role; readOnly?: boolean } = {},
   ): CapabilityDescriptor[] {
-    const stopWords = new Set(["a", "an", "the", "as", "from", "to", "in", "for", "of", "with", "on", "and", "or"]);
+    const stopWords = new Set([
+      "a",
+      "an",
+      "the",
+      "as",
+      "from",
+      "to",
+      "in",
+      "for",
+      "of",
+      "with",
+      "on",
+      "and",
+      "or",
+    ]);
     const terms = (options.query ?? "")
       .toLowerCase()
       .split(/[^a-z0-9_.-]+/)

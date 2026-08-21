@@ -139,7 +139,8 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
         if (stepIndex < aiMaxModelSteps() - 1) {
           messages.push({
             role: "user",
-            content: "Please invoke the propose_plan tool to submit the action plan or provide a final answer.",
+            content:
+              "Please invoke the propose_plan tool to submit the action plan or provide a final answer.",
           });
           continue;
         }
@@ -167,7 +168,8 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
       const call = terminalCalls[0];
       if (!call) throw new HttpError(502, "AI returned an invalid outcome", "invalid_ai_outcome");
       if (call.name === "request_input") {
-        const raw = typeof call.arguments === "string" ? JSON.parse(call.arguments) : call.arguments;
+        const raw =
+          typeof call.arguments === "string" ? JSON.parse(call.arguments) : call.arguments;
         const prompt =
           typeof raw?.prompt === "string"
             ? raw.prompt
@@ -186,9 +188,14 @@ async function runPlannerRequest(input: PlannerInput): Promise<PlannerOutcome> {
           field = { name: rawField.replace(/[^a-zA-Z0-9_]/g, "_") || "input", label: rawField };
         } else if (rawField && typeof rawField === "object") {
           field = {
-            name: typeof rawField.name === "string" && rawField.name ? rawField.name : "input_field",
-            label: typeof rawField.label === "string" && rawField.label ? rawField.label : prompt.slice(0, 50),
-            placeholder: typeof rawField.placeholder === "string" ? rawField.placeholder : undefined,
+            name:
+              typeof rawField.name === "string" && rawField.name ? rawField.name : "input_field",
+            label:
+              typeof rawField.label === "string" && rawField.label
+                ? rawField.label
+                : prompt.slice(0, 50),
+            placeholder:
+              typeof rawField.placeholder === "string" ? rawField.placeholder : undefined,
           };
         } else {
           field = { name: "input_field", label: prompt.slice(0, 50) };
@@ -539,13 +546,15 @@ function resolveCapabilityId(
   if (registry.has(withDots)) return withDots;
   const singleUnderscore = id.replace(/_([a-zA-Z])/, ".$1");
   if (registry.has(singleUnderscore)) return singleUnderscore;
-  const match = registry.descriptors().find(
-    (d) =>
-      d.id.toLowerCase() === id.toLowerCase() ||
-      d.id.toLowerCase() === withDots.toLowerCase() ||
-      d.id.endsWith(`.${id}`) ||
-      d.id.endsWith(`_${id}`),
-  );
+  const match = registry
+    .descriptors()
+    .find(
+      (d) =>
+        d.id.toLowerCase() === id.toLowerCase() ||
+        d.id.toLowerCase() === withDots.toLowerCase() ||
+        d.id.endsWith(`.${id}`) ||
+        d.id.endsWith(`_${id}`),
+    );
   if (match) return match.id;
   return withDots;
 }
@@ -557,31 +566,48 @@ async function normalizeModelProposedPlan(
   expiresAt: string,
 ): Promise<import("./plans/schema.ts").ActionPlan> {
   const parsedRaw = parseJsonSafe(raw);
-  let planData: any = parsedRaw;
+  let planData: Record<string, unknown> =
+    parsedRaw && typeof parsedRaw === "object" ? (parsedRaw as Record<string, unknown>) : {};
   if (parsedRaw && typeof parsedRaw === "object") {
     if ("plan" in parsedRaw) {
-      planData = parseJsonSafe((parsedRaw as { plan: unknown }).plan);
+      planData = (parseJsonSafe((parsedRaw as { plan: unknown }).plan) ?? {}) as Record<
+        string,
+        unknown
+      >;
     } else if ("proposal" in parsedRaw) {
-      planData = parseJsonSafe((parsedRaw as { proposal: unknown }).proposal);
+      planData = (parseJsonSafe((parsedRaw as { proposal: unknown }).proposal) ?? {}) as Record<
+        string,
+        unknown
+      >;
     }
   }
-  if (!planData || typeof planData !== "object") {
+  if (!planData || typeof planData !== "object" || Object.keys(planData).length === 0) {
     throw new HttpError(400, "Invalid plan structure", "invalid_plan");
   }
-  const steps: any[] = [];
+  const steps: import("./plans/schema.ts").PlanStep[] = [];
   const rawSteps = Array.isArray(planData.steps)
     ? planData.steps
     : Array.isArray(planData.actions)
       ? planData.actions
-      : (planData.capabilityId || planData.capability_id || (typeof planData.id === "string" && resolveCapabilityId(planData.id, registry)))
+      : planData.capabilityId ||
+          planData.capability_id ||
+          (typeof planData.id === "string" && resolveCapabilityId(planData.id, registry))
         ? [planData]
         : [];
   for (let index = 0; index < rawSteps.length; index++) {
-    const rawStep: any = parseJsonSafe(rawSteps[index]);
+    const rawStep = parseJsonSafe(rawSteps[index]) as Record<string, unknown> | null;
     if (!rawStep || typeof rawStep !== "object") continue;
-    const rawCapabilityId = rawStep.capabilityId || rawStep.capability_id || rawStep.id || "";
+    const rawCapabilityId =
+      typeof rawStep.capabilityId === "string"
+        ? rawStep.capabilityId
+        : typeof rawStep.capability_id === "string"
+          ? rawStep.capability_id
+          : typeof rawStep.id === "string"
+            ? rawStep.id
+            : "";
     const capabilityId = resolveCapabilityId(rawCapabilityId, registry);
-    const capability = capabilityId && registry.has(capabilityId) ? registry.get(capabilityId) : null;
+    const capability =
+      capabilityId && registry.has(capabilityId) ? registry.get(capabilityId) : null;
     const capabilityVersion =
       typeof rawStep.capabilityVersion === "number"
         ? rawStep.capabilityVersion
@@ -595,18 +621,27 @@ async function normalizeModelProposedPlan(
             .toLowerCase()
             .slice(0, 64)
         : `step_${index + 1}`;
-    const input = parseJsonSafe(rawStep.input ?? {});
-    let resourceKeys = Array.isArray(rawStep.resourceKeys) ? rawStep.resourceKeys : [];
-    let risk = ["mutation", "sensitive", "destructive"].includes(rawStep.risk)
-      ? rawStep.risk
-      : (capability?.risk ?? planData.risk ?? "mutation");
+    const input = parseJsonSafe(rawStep.input ?? {}) ?? {};
+    let resourceKeys = Array.isArray(rawStep.resourceKeys)
+      ? (rawStep.resourceKeys as string[])
+      : [];
+    let risk: "mutation" | "sensitive" | "destructive" =
+      typeof rawStep.risk === "string" &&
+      ["mutation", "sensitive", "destructive"].includes(rawStep.risk)
+        ? (rawStep.risk as "mutation" | "sensitive" | "destructive")
+        : capability?.risk && capability.risk !== "read"
+          ? capability.risk
+          : typeof planData.risk === "string" &&
+              ["mutation", "sensitive", "destructive"].includes(planData.risk)
+            ? (planData.risk as "mutation" | "sensitive" | "destructive")
+            : "mutation";
     let expectedEffect = typeof rawStep.expectedEffect === "string" ? rawStep.expectedEffect : "";
-    if (capability && capability.mutates) {
+    if (capability?.mutates) {
       try {
         const parsedInput = capability.inputSchema.parse(input);
         const preview = await capability.preview(ctx, parsedInput);
         resourceKeys = preview.resourceKeys;
-        risk = capability.risk;
+        if (capability.risk !== "read") risk = capability.risk;
         if (!expectedEffect) expectedEffect = preview.summary;
       } catch {
         // Formal validation in validatePlan
@@ -630,15 +665,18 @@ async function normalizeModelProposedPlan(
   }
   const goal = typeof planData.goal === "string" ? planData.goal : "Execute planned changes";
   const summary = typeof planData.summary === "string" ? planData.summary : goal;
+  const rawScope = planData.scope as { type?: string; id?: string } | undefined;
   const scope =
-    planData.scope && typeof planData.scope === "object"
+    rawScope && typeof rawScope === "object"
       ? {
-          type: ["global", "app", "deployment", "integration", "ai"].includes(planData.scope.type)
-            ? planData.scope.type
-            : "global",
-          id: typeof planData.scope.id === "string" ? planData.scope.id.slice(0, 200) : null,
+          type:
+            rawScope.type &&
+            ["global", "app", "deployment", "integration", "ai"].includes(rawScope.type)
+              ? (rawScope.type as "global" | "app" | "deployment" | "integration" | "ai")
+              : ("global" as const),
+          id: typeof rawScope.id === "string" ? rawScope.id.slice(0, 200) : null,
         }
-      : { type: "global", id: null };
+      : { type: "global" as const, id: null };
   return actionPlanSchema.parse({
     schemaVersion: 1,
     goal,
@@ -646,8 +684,7 @@ async function normalizeModelProposedPlan(
     scope,
     steps,
     warnings: Array.isArray(planData.warnings) ? planData.warnings : [],
-    expectedResult:
-      typeof planData.expectedResult === "string" ? planData.expectedResult : summary,
+    expectedResult: typeof planData.expectedResult === "string" ? planData.expectedResult : summary,
     expiresAt:
       typeof planData.expiresAt === "string" && Date.parse(planData.expiresAt) > Date.now()
         ? planData.expiresAt

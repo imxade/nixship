@@ -854,10 +854,16 @@ export function createCapabilityRegistry(): CapabilityRegistry {
   const flakeOutputSchema = z.preprocess(
     (value) => {
       if (typeof value !== "string" || !value.trim()) return "default";
-      const cleaned = value.trim().replace(/^#/, "").replace(/\.nix$/, "");
+      const cleaned = value
+        .trim()
+        .replace(/^#/, "")
+        .replace(/\.nix$/, "");
       return /^[A-Za-z0-9._+-]+$/.test(cleaned) ? cleaned : "default";
     },
-    z.string().regex(/^[A-Za-z0-9._+-]+$/).default("default"),
+    z
+      .string()
+      .regex(/^[A-Za-z0-9._+-]+$/)
+      .default("default"),
   );
 
   const commonCreateFields = {
@@ -2076,7 +2082,11 @@ export function createCapabilityRegistry(): CapabilityRegistry {
       };
     },
     async execute(ctx, input) {
-      const app = updateApplication(input.appId, { restartPolicy: input.restartPolicy }, { id: ctx.actor.id });
+      const app = updateApplication(
+        input.appId,
+        { restartPolicy: input.restartPolicy },
+        { id: ctx.actor.id },
+      );
       await (await getRuntime()).proxy.reconcile();
       return { id: app.id, updatedAt: app.updated_at };
     },

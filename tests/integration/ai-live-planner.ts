@@ -130,10 +130,10 @@ try {
       const outcome = await planner.runPlanner({
         conversationId: conversation.id,
         actor,
-      text: `Deploy ${harburSourceUrl} as "${harburAppName}"`,
-      provider,
-      requestId: "live-harbur-deploy",
-    });
+        text: `Deploy ${harburSourceUrl} as "${harburAppName}"`,
+        provider,
+        requestId: "live-harbur-deploy",
+      });
       assert.equal(outcome.type, "plan", `Expected plan, got ${outcome.type}`);
       if (outcome.type !== "plan") throw new Error("unreachable");
       const step = outcome.plan.plan.steps.find(

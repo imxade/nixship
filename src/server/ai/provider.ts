@@ -202,6 +202,7 @@ function toModelMessages(messages: ProviderMessage[]): ModelMessage[] {
     } catch {
       outputValue = message.content;
     }
+    type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
     return {
       role: "tool",
       content: [
@@ -209,7 +210,10 @@ function toModelMessages(messages: ProviderMessage[]): ModelMessage[] {
           type: "tool-result",
           toolCallId,
           toolName,
-          output: { type: "json", value: outputValue as any },
+          output: {
+            type: "json",
+            value: outputValue as JsonValue,
+          },
         },
       ],
     };

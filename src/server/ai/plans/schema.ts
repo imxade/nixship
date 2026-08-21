@@ -36,6 +36,7 @@ export const actionPlanSchema = z
   .strict();
 
 export type ActionPlan = z.infer<typeof actionPlanSchema>;
+export type PlanStep = z.infer<typeof planStepSchema>;
 export type PlanRisk = z.infer<typeof planRiskSchema>;
 
 export interface PlanStateSnapshot {
