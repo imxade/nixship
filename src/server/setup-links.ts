@@ -26,3 +26,14 @@ export function currentSetupToken(): string | null {
     if (descriptor !== null) fs.closeSync(descriptor);
   }
 }
+
+export function resolveStartupBanner(options: {
+  quickTunnelUrl: string | null;
+  lanUrl: string;
+  setupToken: string | null;
+}): { label: string; url: string } {
+  const baseUrl = options.quickTunnelUrl ?? options.lanUrl;
+  const label = options.quickTunnelUrl ? "QUICK TUNNEL" : "LAN";
+  const url = options.setupToken ? firstRunSetupUrl(baseUrl, options.setupToken) : baseUrl;
+  return { label, url };
+}

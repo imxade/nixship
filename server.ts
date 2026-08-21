@@ -7,7 +7,7 @@ import { logger } from "./src/server/logger.ts";
 import { lanHttpUrls } from "./src/server/network.ts";
 import { parseQuickTunnelUrl } from "./src/server/quick-tunnel-url.ts";
 import { bootRuntime } from "./src/server/runtime.ts";
-import { currentSetupToken, firstRunSetupUrl } from "./src/server/setup-links.ts";
+import { currentSetupToken, resolveStartupBanner } from "./src/server/setup-links.ts";
 
 const development = process.env.NODE_ENV !== "production";
 const app = next({ dev: development, hostname: config.HOSTNAME, port: config.PORT });
@@ -22,27 +22,79 @@ try {
   await app.close().catch(() => undefined);
   throw error;
 }
-const loggedSetupOrigins = new Set<string>();
+const BANNER_TUNNEL_WAIT_MS = 60_000;
 
-function logSetupLink(label: string, baseUrl: string): void {
-  const token = currentSetupToken();
-  if (!token || loggedSetupOrigins.has(baseUrl)) return;
-  loggedSetupOrigins.add(baseUrl);
-  logger.setupLink(label, firstRunSetupUrl(baseUrl, token));
-}
-
-function logDashboardQuickSetupLink(): void {
+function dashboardQuickTunnelUrl(): string | null {
   const route = platformRuntime.quickTunnels
     .status()
     .routes.find((candidate) => candidate.targetType === "dashboard");
-  if (route?.running && route.url) logSetupLink("Quick Tunnel", route.url);
+  return route?.running && route.url ? route.url : null;
 }
 
-const unsubscribeEvents = events.subscribe((event) => {
-  if (event.type === "quick_tunnel.ready" && event.scope === "system") {
-    logDashboardQuickSetupLink();
-  }
-});
+async function resolveDashboardQuickTunnel(): Promise<string | null> {
+  const existing = dashboardQuickTunnelUrl();
+  if (existing) return existing;
+  if (!config.QUICK_TUNNELS_ENABLED) return null;
+  const dashboardRoute = platformRuntime.quickTunnels
+    .status()
+    .routes.find((candidate) => candidate.targetType === "dashboard");
+  if (!dashboardRoute || dashboardRoute.status === "error") return null;
+  return new Promise<string | null>((resolve) => {
+    let resolved = false;
+    const done = (url: string | null): void => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      clearInterval(poll);
+      unsubscribe();
+      resolve(url);
+    };
+    const timeout = setTimeout(() => done(dashboardQuickTunnelUrl()), BANNER_TUNNEL_WAIT_MS);
+    timeout.unref();
+    const poll = setInterval(() => {
+      const url = dashboardQuickTunnelUrl();
+      if (url) {
+        done(url);
+        return;
+      }
+      const route = platformRuntime.quickTunnels
+        .status()
+        .routes.find((c) => c.targetType === "dashboard");
+      if (!route || route.status === "error") done(null);
+    }, 2_000);
+    poll.unref();
+    const unsubscribe = events.subscribe((event) => {
+      if (event.type === "quick_tunnel.ready" && event.scope === "system") {
+        done(dashboardQuickTunnelUrl());
+      }
+    });
+  });
+}
+
+function primaryLocalUrl(): string {
+  const loopback = ["127.0.0.1", "::1", "localhost"].includes(config.HOSTNAME);
+  const lanUrls = loopback ? [] : lanHttpUrls(config.PORT);
+  if (lanUrls[0]) return lanUrls[0];
+  const configuredHost =
+    config.HOSTNAME === "0.0.0.0"
+      ? "127.0.0.1"
+      : config.HOSTNAME === "::"
+        ? "[::1]"
+        : config.HOSTNAME.includes(":")
+          ? `[${config.HOSTNAME}]`
+          : config.HOSTNAME;
+  return `http://${configuredHost}:${config.PORT}`;
+}
+
+async function printStartupBanner(): Promise<void> {
+  const quickTunnelUrl = await resolveDashboardQuickTunnel();
+  const { label, url } = resolveStartupBanner({
+    quickTunnelUrl,
+    lanUrl: primaryLocalUrl(),
+    setupToken: currentSetupToken(),
+  });
+  logger.banner(label, url);
+}
 
 const server = http.createServer((request, response) => {
   sanitizeForwardedHeaders(request);
@@ -92,22 +144,11 @@ server.listen(config.PORT, config.HOSTNAME, () => {
     address: `http://${config.HOSTNAME}:${config.PORT}`,
     environment: process.env.NODE_ENV,
   });
-  const loopback = ["127.0.0.1", "::1", "localhost"].includes(config.HOSTNAME);
-  const lanUrls = loopback ? [] : lanHttpUrls(config.PORT);
-  if (lanUrls.length > 0) {
-    for (const url of lanUrls) logSetupLink("LAN", url);
-  } else {
-    const configuredHost =
-      config.HOSTNAME === "0.0.0.0"
-        ? "127.0.0.1"
-        : config.HOSTNAME === "::"
-          ? "[::1]"
-          : config.HOSTNAME.includes(":")
-            ? `[${config.HOSTNAME}]`
-            : config.HOSTNAME;
-    logSetupLink("Local", `http://${configuredHost}:${config.PORT}`);
-  }
-  logDashboardQuickSetupLink();
+  void printStartupBanner().catch((error: unknown) => {
+    logger.error("Startup banner failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 });
 
 function sanitizeForwardedHeaders(request: http.IncomingMessage): void {
@@ -175,7 +216,7 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
       error: error instanceof Error ? (error.stack ?? error.message) : String(error),
     });
   }
-  unsubscribeEvents();
+
   for (const socket of upgradedSockets) socket.destroy();
   upgradedSockets.clear();
   server.closeAllConnections();
