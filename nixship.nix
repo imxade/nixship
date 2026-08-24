@@ -2,7 +2,6 @@
   pkgs,
   self,
   systems,
-  ollamaNixRef,
 }:
 let
   pnpmDeps = pkgs.fetchPnpmDeps {
@@ -42,7 +41,6 @@ pkgs.stdenv.mkDerivation {
     export NODE_ENV=production
     export HOSTNAME="\''${HOSTNAME:-0.0.0.0}"
     export PORT="\''${PORT:-3000}"
-    export PLATFORM_OLLAMA_NIX_REF="\''${PLATFORM_OLLAMA_NIX_REF:-${ollamaNixRef}}"
     export PATH="${pkgs.lib.makeBinPath [
       pkgs.nix
       pkgs.git
