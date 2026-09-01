@@ -48,6 +48,24 @@ immediately.
 5. **Deploy**: Nix Ship clones, evaluates the flake, builds via `nix run`, and
    health-checks the candidate before switching traffic.
 
+## Test if deployment works
+
+You can test deployment with [`https://github.com/imxade/kitsy`](https://github.com/imxade/kitsy), a public sample repository that already includes the required `flake.nix` and `flake.lock`.
+
+1. **Open the dashboard**: Navigate to the **Applications** page (`/apps`).
+2. **Open the import dialog**: Click **Import repository** (or **New application** if apps already exist).
+3. **Select Public URL**: In the modal under *Repository source*, click **Public URL**.
+4. **Enter repository details**:
+   - **Application name**: `kitsy` (or your preferred name)
+   - **Public GitHub repository URL**: `https://github.com/imxade/kitsy`
+   - Keep default values for *Branch* (default branch), *Flake app output* (`default`), *Application type* (`Web application`), and *Health path* (`/`).
+5. **Deploy**: Click **Import and deploy**.
+6. **Wait for deployment**: Nix Ship clones the repository, evaluates the flake, executes `nix run`, and performs health checks. You can monitor live progress under the **Logs** tab on the application page.
+7. **Verify access links**: Once deployment state turns active and healthy, access links will appear on the application card and detail view:
+   - **LAN / Local link**: `http://<device-ip>:<port>` or `http://127.0.0.1:<port>`
+   - **Quick Tunnel link**: `https://<random>.trycloudflare.com` (when `cloudflared` is available)
+8. Click or copy the link to open the running application in your browser.
+
 ## Application contract
 
 A web application must remain in the foreground and listen on `HOST` and `PORT`.
